@@ -445,9 +445,9 @@ class Downlib {
      */
     async downloadFromTwitch(url, saveDir) {
         return new Promise((resolve, reject) => {
-            if (!url.match(/^https:\/\/(?:www\.)?twitch\.tv\/videos\/.*/)) {
-                return reject({ error: `Not a valid Twitch video URL?: \`${url}\`` });
-            }
+            if (!url.match(/^https:\/\/(?:www\.)?twitch\.tv\/.*/)) {
+                return reject({ error: `Not a valid Twitch URL: \`${url}\`` });
+            }            
 
             this.ensureDirectoryExists(saveDir);
 
