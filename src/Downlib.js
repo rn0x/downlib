@@ -220,8 +220,8 @@ class Downlib {
                         resolve({ command: command, videos: results });
 
                     } catch (error) {
-                        console.error('Error parsing JSON data:', error);
-                        reject({ command: command, error: `Failed to parse JSON data: ${error}` });
+                        console.error('Error processing the download data:', error);
+                        reject({ command: command, error: `Error processing the download data: ${error}` });
                     }
                 }
             });
@@ -249,64 +249,6 @@ class Downlib {
         }
     }
 
-
-    /**
-     * تحميل فيديو من TikTok.
-     * @param {string} saveDir - المجلد لحفظ الفيديوهات.
-     * @returns {Promise<Buffer>} - الفيديو المحمل.
-     */
-    // async downloadFromTikTok(url, saveDir) {
-    //     return new Promise((resolve, reject) => {
-    //         if (!url.match(/^https:\/\/[a-zA-Z0-9]+\.tiktok.com\/[^\?]+/)) {
-    //             return reject({ error: `Not a TikTok URL?: \`${url}\`` });
-    //         }
-
-    //         this.ensureDirectoryExists(saveDir);
-
-    //         // Set the arguments for yt-dlp
-    //         const args = ['--print-json', '--write-info-json', '--output', `${path.join(saveDir, '%(title)s.%(ext)s')}`, url];
-
-    //         const ytdlp = spawn(this.ytAppPath, args);
-    //         const command = ytdlp.spawnargs.join(" ");
-    //         let rawData = '';
-    //         let jsonResult;
-
-    //         ytdlp.stdout.on('data', (data) => {
-    //             rawData += data.toString();
-    //             // Try to parse JSON from stdout
-    //             try {
-    //                 jsonResult = JSON.parse(rawData);
-    //             } catch (err) {
-    //                 // If parsing fails, continue collecting data
-    //             }
-    //         });
-
-    //         ytdlp.stderr.on('error', (data) => {
-    //             const message = `${data.toString().split(this.Split_issue).join("")}`;
-    //             console.error(`yt-dlp: ${message}`);
-    //             reject({ command: command, error: `${message}` });
-    //         });
-
-    //         ytdlp.on('close', async (code) => {
-    //             if (code !== 0) {
-    //                 console.error(`yt-dlp process exited with code ${code}`);
-    //                 reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-    //             } else {
-    //                 try {
-    //                     const filename = jsonResult._filename;
-    //                     const fileBuffer = fs.readFileSync(filename);
-    //                     delete jsonResult.formats;
-    //                     resolve({ command: command, ...jsonResult, buffer: fileBuffer });
-    //                     await this.deleteFile(filename);
-    //                 } catch (error) {
-    //                     console.error('Error parsing JSON data:', error);
-    //                     reject({ command: command, error: `Failed to parse JSON data: ${error}` });
-    //                 }
-    //             }
-    //         });
-    //     });
-    // }
-
     /**
      * تحميل فيديو من Twitter.
      * @param {string} url - رابط Twitter.
@@ -327,17 +269,9 @@ class Downlib {
             const ytdlp = spawn(this.ytAppPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
-            let jsonResult;
 
             ytdlp.stdout.on('data', (data) => {
                 rawData += data.toString();
-                // Try to parse JSON from stdout
-                try {
-                    jsonResult = JSON.parse(rawData);
-                } catch (error) {
-                    console.error('Error parsing JSON data:', error);
-                    return { error: `Error parsing JSON data: ${error}` };
-                }
             });
 
             ytdlp.stderr.on('error', (data) => {
@@ -350,23 +284,25 @@ class Downlib {
                 if (code !== 0) {
                     console.error(`yt-dlp process exited with code ${code}`);
                     reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                } else {
-                    try {
-                        const filename = jsonResult._filename;
-                        const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
-                        const fileBuffer = fs.readFileSync(filename);
-                        delete jsonResult.formats;
-                        let buffer = fileBuffer;
-                        resolve({ command: command, ...jsonResult, buffer: buffer });
-                        if (this.deleteAfterDownload) {
-                            await this.deleteFile(filename);
-                            await this.deleteFile(filenameJson);
-                        }
+                }
 
-                    } catch (error) {
-                        console.error('Error parsing JSON data:', error);
-                        reject({ command: command, error: `Failed to parse JSON data: ${error}` });
+                try {
+                    if (rawData.length === 0) return;
+                    const jsonResult = JSON.parse(rawData);
+                    const filename = jsonResult._filename;
+                    const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
+                    const fileBuffer = fs.readFileSync(filename);
+                    delete jsonResult.formats;
+                    let buffer = fileBuffer;
+                    resolve({ command: command, ...jsonResult, buffer: buffer });
+                    if (this.deleteAfterDownload) {
+                        await this.deleteFile(filename);
+                        await this.deleteFile(filenameJson);
                     }
+
+                } catch (error) {
+                    console.error('Error processing the download data:', error);
+                    reject({ command: command, error: `Error processing the download data: ${error}` });
                 }
             });
         });
@@ -392,17 +328,9 @@ class Downlib {
             const ytdlp = spawn(this.ytAppPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
-            let jsonResult;
 
             ytdlp.stdout.on('data', (data) => {
                 rawData += data.toString();
-                // Try to parse JSON from stdout
-                try {
-                    jsonResult = JSON.parse(rawData);
-                } catch (error) {
-                    console.error('Error parsing JSON data:', error);
-                    return { error: `Error parsing JSON data: ${error}` };
-                }
             });
 
             ytdlp.stderr.on('error', (data) => {
@@ -415,23 +343,25 @@ class Downlib {
                 if (code !== 0) {
                     console.error(`yt-dlp process exited with code ${code}`);
                     reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                } else {
-                    try {
-                        const filename = jsonResult._filename;
-                        const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
-                        const fileBuffer = fs.readFileSync(filename);
-                        delete jsonResult.formats;
-                        let buffer = fileBuffer;
-                        resolve({ command: command, ...jsonResult, buffer: buffer });
-                        if (this.deleteAfterDownload) {
-                            await this.deleteFile(filename);
-                            await this.deleteFile(filenameJson);
-                        }
-                    } catch (error) {
-                        console.error('Error parsing JSON data:', error);
-                        reject({ command: command, error: `Failed to parse JSON data: ${error}` });
-                    }
                 }
+                try {
+                    if (rawData.length === 0) return;
+                    const jsonResult = JSON.parse(rawData);
+                    const filename = jsonResult._filename;
+                    const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
+                    const fileBuffer = fs.readFileSync(filename);
+                    delete jsonResult.formats;
+                    let buffer = fileBuffer;
+                    resolve({ command: command, ...jsonResult, buffer: buffer });
+                    if (this.deleteAfterDownload) {
+                        await this.deleteFile(filename);
+                        await this.deleteFile(filenameJson);
+                    }
+                } catch (error) {
+                    console.error('Error processing the download data:', error);
+                    reject({ command: command, error: `Error processing the download data: ${error}` });
+                }
+
             });
         });
     }
@@ -447,7 +377,7 @@ class Downlib {
         return new Promise((resolve, reject) => {
             if (!url.match(/^https:\/\/(?:www\.)?twitch\.tv\/.*/)) {
                 return reject({ error: `Not a valid Twitch URL: \`${url}\`` });
-            }            
+            }
 
             this.ensureDirectoryExists(saveDir);
 
@@ -461,13 +391,6 @@ class Downlib {
 
             ytdlp.stdout.on('data', (data) => {
                 rawData += data.toString();
-                // Try to parse JSON from stdout
-                try {
-                    jsonResult = JSON.parse(rawData);
-                } catch (error) {
-                    console.error('Error parsing JSON data:', error);
-                    return { error: `Error parsing JSON data: ${error}` };
-                }
             });
 
             ytdlp.stderr.on('error', (data) => {
@@ -480,22 +403,23 @@ class Downlib {
                 if (code !== 0) {
                     console.error(`yt-dlp process exited with code ${code}`);
                     reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                } else {
-                    try {
-                        const filename = jsonResult._filename;
-                        const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
-                        const fileBuffer = fs.readFileSync(filename);
-                        delete jsonResult.formats;
-                        let buffer = fileBuffer;
-                        resolve({ command: command, ...jsonResult, buffer: buffer });
-                        if (this.deleteAfterDownload) {
-                            await this.deleteFile(filename);
-                            await this.deleteFile(filenameJson);
-                        }
-                    } catch (error) {
-                        console.error('Error parsing JSON data:', error);
-                        reject({ command: command, error: `Failed to parse JSON data: ${error}` });
+                }
+                try {
+                    if (rawData.length === 0) return;
+                    const jsonResult = JSON.parse(rawData);
+                    const filename = jsonResult._filename;
+                    const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
+                    const fileBuffer = fs.readFileSync(filename);
+                    delete jsonResult.formats;
+                    let buffer = fileBuffer;
+                    resolve({ command: command, ...jsonResult, buffer: buffer });
+                    if (this.deleteAfterDownload) {
+                        await this.deleteFile(filename);
+                        await this.deleteFile(filenameJson);
                     }
+                } catch (error) {
+                    console.error('Error processing the download data:', error);
+                    reject({ command: command, error: `Error processing the download data: ${error}` });
                 }
             });
         });
@@ -525,13 +449,6 @@ class Downlib {
 
             ytdlp.stdout.on('data', (data) => {
                 rawData += data.toString();
-                // Try to parse JSON from stdout
-                try {
-                    jsonResult = JSON.parse(rawData);
-                } catch (error) {
-                    console.error('Error parsing JSON data:', error);
-                    return { error: `Error parsing JSON data: ${error}` };
-                }
             });
 
             ytdlp.stderr.on('error', (data) => {
@@ -544,22 +461,23 @@ class Downlib {
                 if (code !== 0) {
                     console.error(`yt-dlp process exited with code ${code}`);
                     reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                } else {
-                    try {
-                        const filename = jsonResult._filename;
-                        const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
-                        const fileBuffer = fs.readFileSync(filename);
-                        delete jsonResult.formats;
-                        let buffer = fileBuffer;
-                        resolve({ command: command, ...jsonResult, buffer: buffer });
-                        if (this.deleteAfterDownload) {
-                            await this.deleteFile(filename);
-                            await this.deleteFile(filenameJson);
-                        }
-                    } catch (error) {
-                        console.error('Error parsing JSON data:', error);
-                        reject({ command: command, error: `Failed to parse JSON data: ${error}` });
+                }
+                try {
+                    if (rawData.length === 0) return;
+                    const jsonResult = JSON.parse(rawData);
+                    const filename = jsonResult._filename;
+                    const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
+                    const fileBuffer = fs.readFileSync(filename);
+                    delete jsonResult.formats;
+                    let buffer = fileBuffer;
+                    resolve({ command: command, ...jsonResult, buffer: buffer });
+                    if (this.deleteAfterDownload) {
+                        await this.deleteFile(filename);
+                        await this.deleteFile(filenameJson);
                     }
+                } catch (error) {
+                    console.error('Error processing the download data:', error);
+                    reject({ command: command, error: `Error processing the download data: ${error}` });
                 }
             });
         });
@@ -578,24 +496,17 @@ class Downlib {
             }
 
             this.ensureDirectoryExists(saveDir);
+            const filename = path.join(saveDir, `${this.generateUniqueId(20)}_.mp3`);
 
             // Set the arguments for yt-dlp
-            const args = ['--print-json', '--write-info-json', '--extract-audio', '--audio-format', 'mp3', '--output', `${path.join(saveDir, '%(title)s.%(ext)s')}`, url];
+            const args = ['--print-json', '--write-info-json', '--extract-audio', '--audio-format', 'mp3', '--output', `${filename}`, url];
 
             const ytdlp = spawn(this.ytAppPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
-            let jsonResult;
 
             ytdlp.stdout.on('data', (data) => {
                 rawData += data.toString();
-                // Try to parse JSON from stdout
-                try {
-                    jsonResult = JSON.parse(rawData);
-                } catch (error) {
-                    console.error('Error parsing JSON data:', error);
-                    return { error: `Error parsing JSON data: ${error}` };
-                }
             });
 
             ytdlp.stderr.on('error', (data) => {
@@ -608,22 +519,22 @@ class Downlib {
                 if (code !== 0) {
                     console.error(`yt-dlp process exited with code ${code}`);
                     reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                } else {
-                    try {
-                        const filename = jsonResult._filename.replace(/.opus/g, '.info.json');
-                        const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
-                        const fileBuffer = fs.readFileSync(filename);
-                        delete jsonResult.formats;
-                        let buffer = fileBuffer;
-                        resolve({ command: command, ...jsonResult, buffer: buffer });
-                        if (this.deleteAfterDownload) {
-                            await this.deleteFile(filename);
-                            await this.deleteFile(filenameJson);
-                        }
-                    } catch (error) {
-                        console.error('Error parsing JSON data:', error);
-                        reject({ command: command, error: `Failed to parse JSON data: ${error}` });
+                }
+                try {
+                    if (rawData.length === 0) return
+                    const jsonResult = JSON.parse(rawData);
+                    const filenameJson = filename + ".info.json"
+                    const fileBuffer = fs.readFileSync(filename);
+                    delete jsonResult.formats;
+                    let buffer = fileBuffer;
+                    resolve({ command: command, ...jsonResult, buffer: buffer });
+                    if (this.deleteAfterDownload) {
+                        await this.deleteFile(filename);
+                        await this.deleteFile(filenameJson);
                     }
+                } catch (error) {
+                    console.error('Error processing the download data:', error);
+                    reject({ command: command, error: `Error processing the download data: ${error}` });
                 }
             });
         });
@@ -654,13 +565,6 @@ class Downlib {
 
             ytdlp.stdout.on('data', (data) => {
                 rawData += data.toString();
-                // Try to parse JSON from stdout
-                try {
-                    jsonResult = JSON.parse(rawData);
-                } catch (error) {
-                    console.error('Error parsing JSON data:', error);
-                    return { error: `Error parsing JSON data: ${error}` };
-                }
             });
 
             ytdlp.stderr.on('error', (data) => {
@@ -673,22 +577,23 @@ class Downlib {
                 if (code !== 0) {
                     console.error(`yt-dlp process exited with code ${code}`);
                     reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                } else {
-                    try {
-                        const filename = jsonResult._filename;
-                        const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
-                        const fileBuffer = fs.readFileSync(filename);
-                        delete jsonResult.formats;
-                        let buffer = fileBuffer;
-                        resolve({ command: command, ...jsonResult, buffer: buffer });
-                        if (this.deleteAfterDownload) {
-                            await this.deleteFile(filename);
-                            await this.deleteFile(filenameJson);
-                        }
-                    } catch (error) {
-                        console.error('Error parsing JSON data:', error);
-                        reject({ command: command, error: `Failed to parse JSON data: ${error}` });
+                }
+                try {
+                    if (rawData.length === 0) return;
+                    const jsonResult = JSON.parse(rawData);
+                    const filename = jsonResult._filename;
+                    const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
+                    const fileBuffer = fs.readFileSync(filename);
+                    delete jsonResult.formats;
+                    let buffer = fileBuffer;
+                    resolve({ command: command, ...jsonResult, buffer: buffer });
+                    if (this.deleteAfterDownload) {
+                        await this.deleteFile(filename);
+                        await this.deleteFile(filenameJson);
                     }
+                } catch (error) {
+                    console.error('Error processing the download data:', error);
+                    reject({ command: command, error: `Error processing the download data: ${error}` });
                 }
             });
         });
@@ -713,7 +618,7 @@ class Downlib {
     /**
      * التحقق من نوع الرابط.
      * @param {string} url - الرابط للتحقق.
-     * @returns {string} - نوع الموقع (YouTube, Instagram, TikTok, Pinterest, Facebook, Twitter, Reddit, SoundCloud, Dailymotion, Twitch).
+     * @returns {string} - نوع الموقع (YouTube, Instagram, TikTok, Facebook, Twitter, Reddit, SoundCloud, Dailymotion, Twitch).
      */
     checkUrlType(url) {
 
@@ -724,7 +629,6 @@ class Downlib {
             'YouTube': /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/,
             'Instagram': /^(https?:\/\/)?(www\.)?instagram\.com\/.+$/,
             'TikTok': /^(https?:\/\/)?(www\.)?tiktok\.com\/.+$/,
-            'Pinterest': /^(https?:\/\/)?(www\.)?pinterest\.com\/.+$/,
             'Facebook': /^(https?:\/\/)?(www\.)?facebook\.com\/.+$/,
             'Twitter': /^(https?:\/\/)?(www\.)?(twitter\.com|x\.com)\/.+$/,
             'Reddit': /^(https?:\/\/)?(www\.)?reddit\.com\/.+$/,
