@@ -238,9 +238,6 @@ class Downlib {
         }
         try {
             const result = await tiktokdl(url);
-
-            console.log(result);
-
             if (result && result.media && result.media.length > 0) {
                 return result;
             } else {
@@ -420,7 +417,6 @@ class Downlib {
                     reject({ command: command, error: `yt-dlp process exited with code ${code}` });
                 } else {
                     try {
-                        console.log("jsonResult: ", jsonResult);
                         const filename = jsonResult._filename;
                         const filenameJson = path.join(saveDir, jsonResult.title + ".info.json");
                         const fileBuffer = fs.readFileSync(filename);
