@@ -696,7 +696,21 @@ class Downlib {
         });
     }
 
-
+    /**
+     * تحقق مما إذا كان النص المعطى يمثل رابط صحيح.
+     * @param {string} url - النص للتحقق منه.
+     * @returns {boolean} - true إذا كان النص يمثل رابط صحيح، وfalse إذا لم يكن.
+     */
+    isValidUrl(url) {
+        let valid = false;
+        try {
+            const parsedUrl = new URL(url);
+            valid = ['http:', 'https:'].includes(parsedUrl.protocol);
+        } catch (error) {
+            return false
+        }
+        return valid;
+    }
 
     /**
      * التحقق من نوع الرابط.
@@ -705,8 +719,7 @@ class Downlib {
      */
     checkUrlType(url) {
 
-        const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
-        if (!urlPattern.test(url)) {
+        if (!this.isValidUrl(url)) {
             return 'Invalid URL';
         }
         const patterns = {
