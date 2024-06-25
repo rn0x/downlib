@@ -21,19 +21,15 @@ const headers = {
  */
 const downloadFromTikTok = async (url) => {
     try {
-        const finalUrl = await getRedirectUrl(url);
-        const videos = await getVideo(finalUrl, false); // Download without watermark
+        const finalUrl = await resolveRedirects(url);
+        const Medias = await fetchMedia(finalUrl, false); // Download without watermark
 
-        if (videos && videos.length > 0) {
-            const mediaItems = await downloadMedia(videos[0]);
-            const extractUsername = () => {
-                const match = url.match(/tiktok\.com\/@([^/]+)/);
-                return match ? match[1] : null;
-            };
+        if (Medias && Medias.length > 0) {
+            const mediaItems = await downloadMedia(Medias[0]);
             return {
-                id: videos[0].id,
+                id: Medias[0].id,
                 url: url,
-                username: extractUsername(),
+                username: extractUsername(url),
                 media: mediaItems
             };
         } else {
@@ -48,11 +44,22 @@ const downloadFromTikTok = async (url) => {
 };
 
 /**
+ * Extracts the username from a TikTok URL.
+ * @param {string} url - The TikTok URL.
+ * @returns {string | null} - The extracted username, or null if not found.
+ */
+const extractUsername = (url) => {
+    const match = url.match(/tiktok\.com\/@([^/]+)/);
+    return match ? match[1] : null;
+};
+
+
+/**
  * Resolves any redirects in the given URL.
  * @param {string} url - The URL to resolve.
  * @returns {Promise<string>} - The final URL after following redirects.
  */
-const getRedirectUrl = async (url) => {
+const resolveRedirects = async (url) => {
     try {
         if (!url) {
             throw new Error('URL is undefined or empty.');
@@ -62,17 +69,17 @@ const getRedirectUrl = async (url) => {
 
         // Check if the URL is a TikTok short link that redirects
         if (finalUrl.includes('vm.tiktok.com') || finalUrl.includes('vt.tiktok.com')) {
-            const res = await axios.get(finalUrl, {
+            const response = await axios.get(finalUrl, {
                 maxRedirects: 10,
                 headers: headers,
             });
-            finalUrl = res.request.res.responseUrl;
+            finalUrl = response.request.res.responseUrl;
             // console.log("[*] Redirected to:", finalUrl);
         }
 
         return finalUrl;
     } catch (err) {
-        console.error("Error in getRedirectUrl:", err);
+        console.error("Error in resolveRedirects:", err);
         throw err;
     }
 };
@@ -83,13 +90,13 @@ const getRedirectUrl = async (url) => {
  * @param {boolean} watermark - Whether to include watermarks.
  * @returns {Promise<{ url: string, images: string[], id: string }[] | null>} - Promise that resolves with an array of video or slideshow information objects, or null if not found.
  */
-const getVideo = async (url, watermark) => {
+const fetchMedia = async (url, watermark) => {
     try {
-        const idVideos = await getIdVideos(url);
+        const ids = await fetchIds(url);
         const results = [];
 
-        for (const idVideo of idVideos) {
-            const API_URL = `https://api22-normal-c-alisg.tiktokv.com/aweme/v1/feed/?aweme_id=${idVideo}&iid=7318518857994389254&device_id=7318517321748022790&channel=googleplay&app_name=musical_ly&version_code=300904&device_platform=android&device_type=ASUS_Z01QD&version=9`;
+        for (const id of ids) {
+            const API_URL = `https://api22-normal-c-alisg.tiktokv.com/aweme/v1/feed/?aweme_id=${id}&iid=7318518857994389254&device_id=7318517321748022790&channel=googleplay&app_name=musical_ly&version_code=300904&device_platform=android&device_type=ASUS_Z01QD&version=9`;
 
             const response = await axios({
                 url: API_URL,
@@ -98,12 +105,12 @@ const getVideo = async (url, watermark) => {
             });
             const body = response.data;
 
-            if (body.aweme_list[0].aweme_id === idVideo) {
+            if (body.aweme_list && body.aweme_list.length > 0 && body.aweme_list[0].aweme_id === id) {
+                const aweme = body.aweme_list[0];
                 let mediaItems = [];
 
-                if (!!body.aweme_list[0].image_post_info) {
-                    // console.log("[*] Media is a slideshow");
-                    body.aweme_list[0].image_post_info.images.forEach((image) => {
+                if (aweme.image_post_info) {
+                    aweme.image_post_info.images.forEach((image) => {
                         mediaItems.push({
                             type: 'image',
                             data: image.display_image.url_list[1],
@@ -111,17 +118,18 @@ const getVideo = async (url, watermark) => {
                     });
                 } else {
                     const urlMedia = watermark
-                        ? body.aweme_list[0].video.download_addr.url_list[0]
-                        : body.aweme_list[0].video.play_addr.url_list[0];
+                        ? aweme.video.download_addr.url_list[0]
+                        : aweme.video.play_addr.url_list[0];
                     mediaItems.push({
                         type: 'video',
                         data: urlMedia,
                     });
                 }
 
+                const url = aweme?.video?.download_addr?.url_list[0] ? aweme?.video?.download_addr?.url_list[0] : aweme.video.play_addr.url_list[0];
                 const data = {
-                    url: body.aweme_list[0].video.download_addr.url_list[0],
-                    id: idVideo,
+                    url: url,
+                    id: id,
                     media: mediaItems,
                 };
 
@@ -131,7 +139,7 @@ const getVideo = async (url, watermark) => {
 
         return results.length > 0 ? results : null;
     } catch (err) {
-        console.error("Error in getVideo:", err);
+        console.error("Error in fetchMedia:", err);
         throw err;
     }
 };
@@ -182,9 +190,9 @@ const downloadMedia = async (item) => {
  * @param {string} url - The TikTok URL.
  * @returns {Promise<string[]>} - Promise that resolves with an array of extracted video or photo IDs.
  */
-const getIdVideos = async (url) => {
+const fetchIds = async (url) => {
     try {
-        let idVideos = [];
+        let ids = [];
 
         if (url.includes('/t/')) {
             url = await new Promise((resolve) => {
@@ -202,20 +210,20 @@ const getIdVideos = async (url) => {
                 url.indexOf('/video/') + 7,
                 url.indexOf('/video/') + 26
             );
-            idVideos.push(idVideo.length > 19 ? idVideo.substring(0, idVideo.indexOf('?')) : idVideo);
+            ids.push(idVideo.length > 19 ? idVideo.substring(0, idVideo.indexOf('?')) : idVideo);
         } else if (matchingPhoto) {
             let idPhoto = url.substring(
                 url.indexOf('/photo/') + 7,
                 url.indexOf('/photo/') + 26
             );
-            idVideos.push(idPhoto.length > 19 ? idPhoto.substring(0, idPhoto.indexOf('?')) : idPhoto);
+            ids.push(idPhoto.length > 19 ? idPhoto.substring(0, idPhoto.indexOf('?')) : idPhoto);
         } else {
             // console.log("[X] Error: URL not found");
         }
 
-        return idVideos;
+        return ids;
     } catch (err) {
-        console.error("Error in getIdVideos:", err);
+        console.error("Error in fetchIds:", err);
         throw err;
     }
 };

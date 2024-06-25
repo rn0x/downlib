@@ -239,6 +239,8 @@ class Downlib {
         try {
             const result = await tiktokdl(url);
 
+            console.log(result);
+
             if (result && result.media && result.media.length > 0) {
                 return result;
             } else {
