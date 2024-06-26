@@ -108,7 +108,7 @@ class Downlib {
     async downloadFromInstagram(url, saveDir) {
         try {
             const decodedUrl = decodeURIComponent(url);
-            if (!decodedUrl.includes('instagram.com')) {
+            if (!decodedUrl.includes('instagram.com') && !decodedUrl.includes('instagr.am')) {
                 return { error: 'Invalid Instagram URL.' };
             }
 
@@ -283,7 +283,7 @@ class Downlib {
             const decodedUrl = decodeURIComponent(url);
             if (!decodedUrl.match(/^https?:\/\/(?:twitter\.com|x\.com|t\.co)\/.*/)) {
                 return reject({ error: `Not a valid x platform (Twitter) URL?: \`${decodedUrl}\`` });
-            }            
+            }
 
             this.ensureDirectoryExists(saveDir);
 
@@ -556,9 +556,9 @@ class Downlib {
     async downloadFromReddit(url, saveDir) {
         const decodedUrl = decodeURIComponent(url);
         return new Promise((resolve, reject) => {
-            if (!url.match(/^https:\/\/(?:www\.)?reddit\.com\/.*\/.*/)) {
+            if (!url.match(/^https?:\/\/(?:www\.)?(reddit\.com|redd\.it)\/.*/)) {
                 return reject({ error: `Not a valid Reddit URL?: \`${decodedUrl}\`` });
-            }
+            }            
 
             this.ensureDirectoryExists(saveDir);
 
