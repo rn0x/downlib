@@ -281,9 +281,9 @@ class Downlib {
     async downloadFromTwitter(url, saveDir) {
         return new Promise((resolve, reject) => {
             const decodedUrl = decodeURIComponent(url);
-            if (!decodedUrl.match(/^https:\/\/(?:twitter\.com|x\.com)\/([^/]+)\/status\/([^/?]+)/)) {
+            if (!decodedUrl.match(/^https?:\/\/(?:twitter\.com|x\.com|t\.co)\/.*/)) {
                 return reject({ error: `Not a valid x platform (Twitter) URL?: \`${decodedUrl}\`` });
-            }
+            }            
 
             this.ensureDirectoryExists(saveDir);
 
@@ -630,10 +630,11 @@ class Downlib {
             'TikTok': /^(https?:\/\/)?(www\.)?(tiktok\.com|vt\.tiktok\.com)\/[\w\-\.]+\/?$/,
             'Facebook': /^(https?:\/\/)?(www\.)?facebook\.com\/.+$/,
             'Twitter': /^(https?:\/\/)?(www\.)?(twitter\.com|x\.com)\/.+$/,
-            'Reddit': /^(https?:\/\/)?(www\.)?reddit\.com\/.+$/,
+            'Reddit': /^(https?:\/\/)?(www\.)?(redd\.it|reddit\.com)\/.+$/,
             'SoundCloud': /^(https?:\/\/)?(www\.)?(soundcloud\.com|on\.soundcloud\.com)\/.+$/,
             'Dailymotion': /^(https?:\/\/)?(www\.)?dailymotion\.com\/.+$/,
-            'Twitch': /^(https?:\/\/)?(www\.)?twitch\.tv\/.+$/
+            'Twitch': /^(https?:\/\/)?(www\.)?twitch\.tv\/.+$/,
+            'Telegram': /^(https?:\/\/)?(www\.)?(t\.me\/\w+|telegram\.me\/\w+)$/,
         };
 
         for (const [type, pattern] of Object.entries(patterns)) {
