@@ -164,79 +164,81 @@ class Downlib {
      * @returns {Promise<Array>} - List of downloaded video information.
      */
     async downloadFromYouTube(url, saveDir, options = { audioOnly: false }) {
+        const decodedUrl = decodeURIComponent(url);
+        if (!decodedUrl.match(/^(https:\/\/(www\.)?youtube\.com\/(watch\?v=|playlist\?list=|shorts\/)|https:\/\/youtu\.be\/)/)) {
+            return Promise.reject({ error: `Not a YouTube URL?: \`${decodedUrl}\`` });
+        }
+
+        this.ensureDirectoryExists(saveDir);
+        const args = [
+            '--print-json',
+            '--write-info-json',
+            '--merge-output-format', 'mp4',
+            '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`
+        ];
+
+        if (!options.audioOnly) {
+            args.push('-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best');
+        }
+
+        args.push(decodedUrl);
+        const ytdlp = spawn(this.ytAppPath, args);
+        const command = `${this.ytAppPath} ${args.join(' ')}`;
+        let rawData = '';
+
+        ytdlp.stdout.on('data', (data) => {
+            rawData += data.toString();
+        });
+
+        ytdlp.stderr.on('error', (data) => {
+            const message = data.toString().replace(this.Split_issue, '');
+            reject({ command, error: `yt-dlp error: ${message}` });
+        });
+
         return new Promise((resolve, reject) => {
-            const decodedUrl = decodeURIComponent(url);
-            if (!decodedUrl.match(/^(https:\/\/(www\.)?youtube\.com\/(watch\?v=|playlist\?list=|shorts\/)|https:\/\/youtu\.be\/)/)) {
-                return reject({ error: `Not a YouTube URL?: \`${decodedUrl}\`` });
-            }
-
-            this.ensureDirectoryExists(saveDir);
-            // Set the arguments for yt-dlp based on options
-            const args = [
-                '--print-json',
-                '--write-info-json',
-                '--merge-output-format', 'mp4',
-                '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`
-            ];
-
-            if (!options.audioOnly) {
-                args.push('-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best');
-            }
-
-            args.push(decodedUrl);
-            const ytdlp = spawn(this.ytAppPath, args);
-            const command = `${this.ytAppPath} ${args.join(' ')}`;
-            let rawData = '';
-            let jsonResults = [];
-
-            ytdlp.stdout.on('data', (data) => {
-                rawData += data.toString();
-                // Split rawData by new lines and parse each JSON object
-                const lines = rawData.split('\n');
-                rawData = lines.pop(); // Keep the last line (it might be incomplete)
-                for (const line of lines) {
-                    try {
-                        const json = JSON.parse(line);
-                        jsonResults.push(json);
-                    } catch (error) {
-                        reject({ error: `Error parsing JSON line: ${error}` });
-                    }
-                }
-            });
-
-            ytdlp.stderr.on('error', (data) => {
-                const message = data.toString().replace(this.Split_issue, '');
-                reject({ command, error: `yt-dlp error: ${message}` });
-            });
-
             ytdlp.on('close', async (code) => {
                 try {
                     const results = [];
 
                     // Process each downloaded video information
-                    for (const json of jsonResults) {
-                        const videoId = json.id;
-                        const videoFileName = `${videoId}.mp4`;
-                        const infoFileName = `${videoId}.info.json`;
-                        const videoFilePath = path.join(saveDir, videoFileName);
-                        const infoFilePath = path.join(saveDir, infoFileName);
+                    const lines = rawData.split('\n');
+                    for (const line of lines) {
+                        if (line.trim() === '') {
+                            continue; // Skip empty lines
+                        }
+                        try {
+                            const json = JSON.parse(line);
 
-                        // Read video file buffer
-                        const fileBuffer = fs.readFileSync(videoFilePath);
+                            // Check if JSON parsing was successful
+                            if (!json || typeof json !== 'object') {
+                                throw new Error(`Invalid JSON data: ${line}`);
+                            }
 
-                        // Prepare result object
-                        const result = { ...json, buffer: fileBuffer };
+                            const videoId = json.id;
+                            const videoFileName = `${videoId}.mp4`;
+                            const infoFileName = `${videoId}.info.json`;
+                            const videoFilePath = path.join(saveDir, videoFileName);
+                            const infoFilePath = path.join(saveDir, infoFileName);
 
-                        // Remove formats key from result
-                        delete result.formats;
+                            // Read video file buffer
+                            const fileBuffer = fs.readFileSync(videoFilePath);
 
-                        // Push result into results array
-                        results.push(result);
+                            // Prepare result object
+                            const result = { ...json, buffer: fileBuffer };
 
-                        // Optionally delete files after download
-                        if (this.deleteAfterDownload) {
-                            await this.deleteFile(videoFilePath);
-                            await this.deleteFile(infoFilePath);
+                            // Remove formats key from result
+                            delete result.formats;
+
+                            // Push result into results array
+                            results.push(result);
+
+                            // Optionally delete files after download
+                            if (this.deleteAfterDownload) {
+                                await this.deleteFile(videoFilePath);
+                                await this.deleteFile(infoFilePath);
+                            }
+                        } catch (error) {
+                            reject({ command, error: `Error processing JSON line: ${error}` });
                         }
                     }
 
