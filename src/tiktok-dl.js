@@ -8,16 +8,22 @@
 
 import axios from 'axios';
 
-// إضافة user-agent لتجنب الحظر
+// Add user-agent to avoid ban
 const headers = {
-    'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
 };
+
+/**
+ * Creates a promise that resolves after a specified delay.
+ * @param {number} ms - The delay in milliseconds.
+ * @returns {Promise<void>} - A promise that resolves after the delay.
+ */
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Downloads media (video or image slides) from a TikTok URL without watermarks.
  * @param {string} url - The TikTok post URL to download media from.
- * @returns {Promise<{ id: string, url: string, username: string | null, media: { type: string, data: Buffer }[] } | null>} - Promise that resolves with the downloaded media buffers and information, or null if media not found.
+ * @returns {Promise<{ id: string, url: string, username: string | null, media: { type: string, data: Buffer }[] } | { error: string }>} - Promise that resolves with the downloaded media buffers and information, or an error message if media not found.
  */
 const downloadFromTikTok = async (url) => {
     try {
@@ -34,12 +40,11 @@ const downloadFromTikTok = async (url) => {
             };
         } else {
             return {
-                error: `[X] Media not found at URL: ${url}`
+                error: `[X] ${JSON.stringify(Medias)}\nMedia not found at URL: ${url}`
             };
         }
     } catch (err) {
-        console.error("Error in downloadFromTikTok:", err);
-        throw err;
+        return { error: `Error in downloadFromTikTok: ${err.message}` };
     }
 };
 
@@ -52,7 +57,6 @@ const extractUsername = (url) => {
     const match = url.match(/tiktok\.com\/@([^/]+)/);
     return match ? match[1] : null;
 };
-
 
 /**
  * Resolves any redirects in the given URL.
@@ -79,8 +83,7 @@ const resolveRedirects = async (url) => {
 
         return finalUrl;
     } catch (err) {
-        console.error("Error in resolveRedirects:", err);
-        throw err;
+        return { error: `Error in resolveRedirects: ${err.message}` };
     }
 };
 
@@ -88,70 +91,89 @@ const resolveRedirects = async (url) => {
  * Fetches video or slideshow information from TikTok API.
  * @param {string} url - The TikTok video URL.
  * @param {boolean} watermark - Whether to include watermarks.
- * @returns {Promise<{ url: string, images: string[], id: string }[] | null>} - Promise that resolves with an array of video or slideshow information objects, or null if not found.
+ * @returns {Promise<{ url: string, images: string[], id: string }[] | { error: string }>} - Promise that resolves with an array of video or slideshow information objects, or an error message if not found.
  */
 const fetchMedia = async (url, watermark) => {
     try {
         const ids = await fetchIds(url);
         const results = [];
+        const maxRetries = 5; // Max retries for any error
 
         for (const id of ids) {
             const API_URL = `https://api22-normal-c-alisg.tiktokv.com/aweme/v1/feed/?aweme_id=${id}&iid=7318518857994389254&device_id=7318517321748022790&channel=googleplay&app_name=musical_ly&version_code=300904&device_platform=android&device_type=ASUS_Z01QD&version=9`;
 
-            const response = await axios({
-                url: API_URL,
-                method: 'OPTIONS',
-                headers: headers,
-            });
-            const body = response.data;
+            let attempts = 0;
+            let success = false;
 
-            if (body.aweme_list && body.aweme_list.length > 0 && body.aweme_list[0].aweme_id === id) {
-                const aweme = body.aweme_list[0];
-                let mediaItems = [];
+            while (attempts < maxRetries && !success) {
+                try {
+                    await delay(2000); // 2 second delay between requests
 
-                if (aweme.image_post_info) {
-                    aweme.image_post_info.images.forEach((image) => {
-                        mediaItems.push({
-                            type: 'image',
-                            data: image.display_image.url_list[1],
-                        });
+                    const response = await axios({
+                        url: API_URL,
+                        method: 'OPTIONS',
+                        headers: headers,
                     });
-                } else {
-                    const urlMedia = watermark
-                        ? aweme.video.download_addr.url_list[0]
-                        : aweme.video.play_addr.url_list[0];
-                    mediaItems.push({
-                        type: 'video',
-                        data: urlMedia,
-                    });
+
+                    const body = response.data;
+
+                    if (body.aweme_list && body.aweme_list.length > 0 && body.aweme_list[0].aweme_id === id) {
+                        const aweme = body.aweme_list[0];
+                        let mediaItems = [];
+
+                        if (aweme.image_post_info) {
+                            aweme.image_post_info.images.forEach((image) => {
+                                mediaItems.push({
+                                    type: 'image',
+                                    data: image.display_image.url_list[1],
+                                });
+                            });
+                        } else {
+                            const urlMedia = watermark
+                                ? aweme.video.download_addr.url_list[0]
+                                : aweme.video.play_addr.url_list[0];
+                            mediaItems.push({
+                                type: 'video',
+                                data: urlMedia,
+                            });
+                        }
+
+                        const url = aweme?.video?.download_addr?.url_list[0] ? aweme?.video?.download_addr?.url_list[0] : aweme.video.play_addr.url_list[0];
+                        const data = {
+                            url: url,
+                            id: id,
+                            media: mediaItems,
+                        };
+
+                        results.push(data);
+                        success = true; // Exit the retry loop if successful
+                    } else {
+                        throw new Error('No media found');
+                    }
+                } catch (err) {
+                    await delay(2000 * (attempts + 1)); // Exponential backoff
+                    attempts++;
                 }
+            }
 
-                const url = aweme?.video?.download_addr?.url_list[0] ? aweme?.video?.download_addr?.url_list[0] : aweme.video.play_addr.url_list[0];
-                const data = {
-                    url: url,
-                    id: id,
-                    media: mediaItems,
-                };
-
-                results.push(data);
+            if (!success) {
+                return { error: `Failed to fetch media after ${maxRetries} attempts` };
             }
         }
 
-        return results.length > 0 ? results : null;
+        return results.length > 0 ? results : { error: '[X] No media found' };
     } catch (err) {
-        console.error("Error in fetchMedia:", err);
-        throw err;
+        return { error: `Error in fetchMedia: ${err.message}` };
     }
 };
 
 /**
  * Downloads media buffers (images or video) from provided URLs.
  * @param {{ url: string, id: string, media: { type: string, url: string, fileName: string, buffer: Buffer }[] }} item - The object containing URLs and ID of media.
- * @returns {Promise<{ type: string, url: string, fileName: string, buffer: Buffer }[]>} - Promise that resolves with an array of objects containing downloaded media buffers and their corresponding URLs.
+ * @returns {Promise<{ type: string, url: string, fileName: string, buffer: Buffer }[] | { error: string }>} - Promise that resolves with an array of objects containing downloaded media buffers and their corresponding URLs.
  */
 const downloadMedia = async (item) => {
     try {
-
         let mediaItems = [];
         let index = 1;
         for (const mediaItem of item.media) {
@@ -180,15 +202,14 @@ const downloadMedia = async (item) => {
 
         return mediaItems;
     } catch (err) {
-        console.error("Error in downloadMedia:", err);
-        throw err;
+        return { error: `Error in downloadMedia: ${err.message}` };
     }
 };
 
 /**
  * Extracts TikTok video or photo IDs from the provided URL.
  * @param {string} url - The TikTok URL.
- * @returns {Promise<string[]>} - Promise that resolves with an array of extracted video or photo IDs.
+ * @returns {Promise<string[] | { error: string }>} - Promise that resolves with an array of extracted video or photo IDs.
  */
 const fetchIds = async (url) => {
     try {
@@ -218,13 +239,12 @@ const fetchIds = async (url) => {
             );
             ids.push(idPhoto.length > 19 ? idPhoto.substring(0, idPhoto.indexOf('?')) : idPhoto);
         } else {
-            // console.log("[X] Error: URL not found");
+            return { error: '[X] Error: URL not found' };
         }
 
         return ids;
     } catch (err) {
-        console.error("Error in fetchIds:", err);
-        throw err;
+        return { error: `Error in fetchIds: ${err.message}` };
     }
 };
 

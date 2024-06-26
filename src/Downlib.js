@@ -19,12 +19,12 @@ import tiktokdl from './tiktok-dl.js';
 
 /**
  * @class Downlib
- * @classdesc كلاس لتحميل المحتوى من مواقع شهيرة.
+ * @classdesc A class for downloading content from popular websites.
  */
 class Downlib {
     /**
      * @constructor
-     * @param {object} options - كائن يحتوي على إعدادات.
+     * @param {object} options - An object containing settings.
      */
     constructor(options) {
 
@@ -39,10 +39,10 @@ class Downlib {
     }
 
     /**
-     * تحقق من وجود المجلد وإنشائه إذا لم يكن موجودًا.
-     * @param {string} dirPath - مسار المجلد.
+     * Check if a directory exists and create it if it doesn't.
+     * @param {string} dirPath - The path of the directory.
      * @returns {void}
-     * @throws {Error} - إذا فشل في إنشاء المجلد.
+     * @throws {Error} - If failed to create the directory.
      */
     ensureDirectoryExists(dirPath) {
         try {
@@ -51,21 +51,20 @@ class Downlib {
                 console.log(`Directory created: ${dirPath}`);
             }
         } catch (error) {
-            console.error(`Error creating directory: ${dirPath}`, error);
-            throw error;
+            return { error: `Error creating directory: ${dirPath} ${error}` };
         }
     }
 
     /**
-     * حذف ملف من نظام الملفات.
-     * @param {string} filepath - مسار الملف للحذف.
-     * @returns {Promise<void>} - وعد بحذف الملف.
+     * Delete a file from the file system.
+     * @param {string} filepath - The file path to delete.
+     * @returns {Promise<void>} - A promise to delete the file.
      */
     async deleteFile(filepath) {
         return new Promise((resolve, reject) => {
             fs.access(filepath, fs.constants.F_OK, (err) => {
                 if (err) {
-                    console.error(`File not found: ${filepath}`);
+                    // console.error(`File not found: ${filepath}`);
                     return resolve(); // If file doesn't exist, resolve without error
                 }
                 fs.unlink(filepath, (err) => {
@@ -79,99 +78,114 @@ class Downlib {
             });
         });
     }
+    /**
+     * Extracts the file extension from a given filename.
+     * @param {string} filename - The name of the file.
+     * @returns {string} - The file extension, or an error message if invalid.
+     */
+    getFileExtension(filename) {
+        try {
+            // Regular expression to match the file extension
+            const extensionPattern = /\.([0-9a-zA-Z]+)$/i;
+            const match = filename.match(extensionPattern);
+
+            if (match && match[1]) {
+                return match[1];
+            } else {
+                throw new Error('Invalid filename format');
+            }
+        } catch (error) {
+            return `Error: ${error.message}`;
+        }
+    }
 
     /**
-     * تحميل صورة أو فيديو من Instagram.
-     * @param {string} url - رابط Instagram.
-     * @param {string} saveDir - المجلد لحفظ الفيديوهات.
-     * @returns {Promise<Buffer>} - المحتوى المحمل.
+     * Download image or video from Instagram.
+     * @param {string} url - Instagram URL.
+     * @param {string} saveDir - Directory to save media.
+     * @returns {Promise<Object>} - Downloaded media content.
      */
     async downloadFromInstagram(url, saveDir) {
         try {
-            if (!url.includes('instagram.com')) {
+            const decodedUrl = decodeURIComponent(url);
+            if (!decodedUrl.includes('instagram.com')) {
                 return { error: 'Invalid Instagram URL.' };
             }
 
             this.ensureDirectoryExists(saveDir);
 
-            let links = await instagramGetUrl(url);
+            let links = await instagramGetUrl(decodedUrl);
 
-            if (!links || links?.url_list?.length === 0) {
+            if (!links || !links.url_list || links.url_list.length === 0) {
                 return { error: 'Failed to retrieve media URL from Instagram.' };
             }
 
             const mediaPromises = links.url_list.map(async (mediaUrl) => {
                 const response = await axios.get(mediaUrl, { responseType: 'arraybuffer' });
-
                 if (!response.data) {
                     return { error: 'Failed to download media from Instagram.' };
                 }
 
-                return response.data;
+                const fileType = await fileTypeFromBuffer(response.data);
+                const extension = fileType ? `.${fileType.ext}` : '.bin';
+                const filename = `${this.generateUniqueId(20)}_${extension}`;
+                const filepath = path.join(saveDir, filename);
+
+                fs.writeFileSync(filepath, response.data);
+
+                return {
+                    link: decodedUrl,
+                    extension: extension,
+                    filename: filename,
+                    buffer: response.data
+                };
             });
 
-            const buffers = await Promise.all(mediaPromises);
-            const results = [];
-            for (const iterator of buffers) {
-                try {
-                    const fileType = await fileTypeFromBuffer(iterator);
-                    const extension = fileType ? `.${fileType.ext}` : '.bin';
-                    const filename = `${this.generateUniqueId(20)}_${extension}`
-                    const filepath = path.join(saveDir, filename);
-                    fs.writeFileSync(filepath, iterator);
-                    let buffer = iterator;
-                    results.push({
-                        link: url,
-                        extension: extension,
-                        filename: filename,
-                        buffer: buffer
-                    });
-                    if (this.deleteAfterDownload) {
-                        await this.deleteFile(filepath);
-                    }
-                } catch (error) {
-                    console.error('Error downloading from Instagram:', error);
-                    return { error: `Failed to download from Instagram: ${error}` };
-                }
+            const results = await Promise.all(mediaPromises);
+
+            if (this.deleteAfterDownload) {
+                await Promise.all(results.map(async (result) => {
+                    await this.deleteFile(path.join(saveDir, result.filename));
+                }));
             }
 
-            return {
-                results: results
-            }
+            return { results };
         } catch (error) {
-            console.error('Error downloading from Instagram:', error);
-            return { error: `Failed to download from Instagram: ${error}` };
-
+            return { error: `Failed to download from Instagram: ${error.message}` };
         }
     }
 
-
-
     /**
-     * تحميل فيديو أو قائمة تشغيل من YouTube.
-     * @param {string} url - رابط YouTube.
-     * @param {string} saveDir - المجلد لحفظ الفيديوهات.
-     * @param {Object} options - خيارات التحميل.
-     * @param {boolean} options.audioOnly - إذا كانت القيمة true، يتم تحميل الصوت فقط.
-     * @returns {Promise<Array>} - قائمة معلومات الفيديوهات المحملة.
+     * Download a video or playlist from YouTube.
+     * @param {string} url - YouTube link.
+     * @param {string} saveDir - The directory to save the videos.
+     * @param {Object} options - Download options.
+     * @param {boolean} options.audioOnly - If true, download audio only.
+     * @returns {Promise<Array>} - List of downloaded video information.
      */
     async downloadFromYouTube(url, saveDir, options = { audioOnly: false }) {
         return new Promise((resolve, reject) => {
-            if (!url.match(/^(https:\/\/(www\.)?youtube\.com\/(watch\?v=|playlist\?list=|shorts\/)|https:\/\/youtu\.be\/)/)) {
-                return reject({ error: `Not a YouTube URL?: \`${url}\`` });
+            const decodedUrl = decodeURIComponent(url);
+            if (!decodedUrl.match(/^(https:\/\/(www\.)?youtube\.com\/(watch\?v=|playlist\?list=|shorts\/)|https:\/\/youtu\.be\/)/)) {
+                return reject({ error: `Not a YouTube URL?: \`${decodedUrl}\`` });
             }
 
             this.ensureDirectoryExists(saveDir);
-
             // Set the arguments for yt-dlp based on options
-            const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(title)s.%(ext)s')}`];
+            const args = [
+                '--print-json',
+                '--write-info-json',
+                '--merge-output-format', 'mp4',
+                '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`
+            ];
+
             if (!options.audioOnly) {
                 args.push('-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best');
             }
-            args.push(url);
 
+            args.push(decodedUrl);
             const ytdlp = spawn(this.ytAppPath, args);
-            const command = ytdlp.spawnargs.join(" ");
+            const command = `${this.ytAppPath} ${args.join(' ')}`;
             let rawData = '';
             let jsonResults = [];
 
@@ -185,86 +199,94 @@ class Downlib {
                         const json = JSON.parse(line);
                         jsonResults.push(json);
                     } catch (error) {
-                        return { error: `Error parsing JSON line: ${error}` };
+                        reject({ error: `Error parsing JSON line: ${error}` });
                     }
                 }
             });
 
             ytdlp.stderr.on('error', (data) => {
-                const message = `${data.toString().split(this.Split_issue).join("")}`;
-                console.error(`yt-dlp: ${message}`);
-                reject({ command: command, error: `${message}` });
+                const message = data.toString().replace(this.Split_issue, '');
+                reject({ command, error: `yt-dlp error: ${message}` });
             });
 
             ytdlp.on('close', async (code) => {
-                if (code !== 0) {
-                    console.error(`yt-dlp process exited with code ${code}`);
-                    reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                } else {
-                    try {
-                        const results = [];
+                try {
+                    const results = [];
 
-                        for (const json of jsonResults) {
-                            const filename = json._filename;
-                            const filenameJson = path.join(saveDir, json.title + ".info.json");
-                            const fileBuffer = fs.readFileSync(filename);
-                            delete json.formats;
-                            let buffer = fileBuffer;
-                            results.push({ ...json, buffer: buffer });
-                            if (this.deleteAfterDownload) {
-                                await this.deleteFile(filename);
-                                await this.deleteFile(filenameJson);
-                            }
+                    // Process each downloaded video information
+                    for (const json of jsonResults) {
+                        const videoId = json.id;
+                        const videoFileName = `${videoId}.mp4`;
+                        const infoFileName = `${videoId}.info.json`;
+                        const videoFilePath = path.join(saveDir, videoFileName);
+                        const infoFilePath = path.join(saveDir, infoFileName);
+
+                        // Read video file buffer
+                        const fileBuffer = fs.readFileSync(videoFilePath);
+
+                        // Prepare result object
+                        const result = { ...json, buffer: fileBuffer };
+
+                        // Remove formats key from result
+                        delete result.formats;
+
+                        // Push result into results array
+                        results.push(result);
+
+                        // Optionally delete files after download
+                        if (this.deleteAfterDownload) {
+                            await this.deleteFile(videoFilePath);
+                            await this.deleteFile(infoFilePath);
                         }
-
-                        resolve({ command: command, videos: results });
-
-                    } catch (error) {
-                        console.error('Error processing the download data:', error);
-                        reject({ command: command, error: `Error processing the download data: ${error}` });
                     }
+
+                    // Resolve with command and results
+                    resolve({ command, videos: results });
+                } catch (error) {
+                    reject({ command, error: `Error processing the download data: ${error}` });
                 }
             });
         });
     }
 
     /**
-     * تحميل فيديو من TikTok.
-     * @returns {Promise<Object>} - الفيديو المحمل.
+     * Download a video from TikTok.
+     * @returns {Promise<Object>} - The downloaded video.
      */
     async downloadFromTikTok(url, saveDir) {
-        if (!url.match(/^https:\/\/[a-zA-Z0-9]+\.tiktok.com\/[^\?]+/)) {
-            return { error: `Not a TikTok URL?: \`${url}\`` };
+        const decodedUrl = decodeURIComponent(url);
+        if (!decodedUrl.match(/^https:\/\/[a-zA-Z0-9]+\.tiktok.com\/[^\?]+/)) {
+            return { error: `Not a TikTok URL?: \`${decodedUrl}\`` };
         }
         try {
-            const result = await tiktokdl(url);
+            const result = await tiktokdl(decodedUrl);
             if (result && result.media && result.media.length > 0) {
                 return result;
             } else {
-                return { error: 'No media found to download.' };
+                return { error: 'No media found to download' };
             }
         } catch (error) {
-            console.error('Error in downloadFromTikTok:', error);
             return { error: `Error in downloadFromTikTok: ${error}` };
         }
     }
 
     /**
-     * تحميل فيديو من Twitter.
-     * @param {string} url - رابط Twitter.
-     * @param {string} saveDir - المجلد لحفظ الفيديوهات.
-     * @returns {Promise<Object>} - الفيديو المحمل ومعلوماته.
+     * Download a video from Twitter.
+     * @param {string} url - The Twitter link.
+     * @param {string} saveDir - The directory to save the videos.
+     * @returns {Promise<Object>} - The downloaded video and its information.
      */
     async downloadFromTwitter(url, saveDir) {
         return new Promise((resolve, reject) => {
-            if (!url.match(/^https:\/\/(?:twitter\.com|x\.com)\/([^/]+)\/status\/([^/?]+)/)) {
-                return reject({ error: `Not a valid x platform (Twitter) URL?: \`${url}\`` });
+            const decodedUrl = decodeURIComponent(url);
+            if (!decodedUrl.match(/^https:\/\/(?:twitter\.com|x\.com)\/([^/]+)\/status\/([^/?]+)/)) {
+                return reject({ error: `Not a valid x platform (Twitter) URL?: \`${decodedUrl}\`` });
             }
 
             this.ensureDirectoryExists(saveDir);
 
             // Set the arguments for yt-dlp
-            const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(title)s.%(ext)s')}`, url];
+            const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`, decodedUrl];
 
             const ytdlp = spawn(this.ytAppPath, args);
             const command = ytdlp.spawnargs.join(" ");
@@ -276,16 +298,10 @@ class Downlib {
 
             ytdlp.stderr.on('error', (data) => {
                 const message = `${data.toString().split(this.Split_issue).join("")}`;
-                console.error(`yt-dlp: ${message}`);
-                reject({ command: command, error: `${message}` });
+                reject({ command: command, error: `yt-dlp: ${message}` });
             });
 
             ytdlp.on('close', async (code) => {
-                if (code !== 0) {
-                    console.error(`yt-dlp process exited with code ${code}`);
-                    reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                }
-
                 try {
                     if (rawData.length === 0) return;
                     const jsonResult = JSON.parse(rawData);
@@ -301,7 +317,6 @@ class Downlib {
                     }
 
                 } catch (error) {
-                    console.error('Error processing the download data:', error);
                     reject({ command: command, error: `Error processing the download data: ${error}` });
                 }
             });
@@ -309,21 +324,22 @@ class Downlib {
     }
 
     /**
-     * تحميل فيديو من Facebook.
-     * @param {string} url - رابط Facebook.
-     * @param {string} saveDir - المجلد لحفظ الفيديوهات.
-     * @returns {Promise<Object>} - الفيديو المحمل ومعلوماته.
+     * Download a video from Facebook.
+     * @param {string} url - The Facebook link.
+     * @param {string} saveDir - The directory to save the videos.
+     * @returns {Promise<Object>} - The downloaded video and its information.
      */
     async downloadFromFacebook(url, saveDir) {
         return new Promise((resolve, reject) => {
-            if (!url.match(/^https:\/\/(?:www\.)?facebook\.com\/.*\/videos\/.*/)) {
-                return reject({ error: `Not a valid Facebook video URL?: \`${url}\`` });
+            const decodedUrl = decodeURIComponent(url);
+            if (!decodedUrl.match(/^https:\/\/(?:www\.)?facebook\.com\/.*\/videos\/.*/)) {
+                return reject({ error: `Not a valid Facebook video URL?: \`${decodedUrl}\`` });
             }
 
             this.ensureDirectoryExists(saveDir);
 
             // Set the arguments for yt-dlp
-            const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(title)s.%(ext)s')}`, url];
+            const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`, decodedUrl];
 
             const ytdlp = spawn(this.ytAppPath, args);
             const command = ytdlp.spawnargs.join(" ");
@@ -335,15 +351,10 @@ class Downlib {
 
             ytdlp.stderr.on('error', (data) => {
                 const message = `${data.toString().split(this.Split_issue).join("")}`;
-                console.error(`yt-dlp: ${message}`);
-                reject({ command: command, error: `${message}` });
+                reject({ command: command, error: `yt-dlp: ${message}` });
             });
 
             ytdlp.on('close', async (code) => {
-                if (code !== 0) {
-                    console.error(`yt-dlp process exited with code ${code}`);
-                    reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                }
                 try {
                     if (rawData.length === 0) return;
                     const jsonResult = JSON.parse(rawData);
@@ -358,7 +369,6 @@ class Downlib {
                         await this.deleteFile(filenameJson);
                     }
                 } catch (error) {
-                    console.error('Error processing the download data:', error);
                     reject({ command: command, error: `Error processing the download data: ${error}` });
                 }
 
@@ -366,28 +376,27 @@ class Downlib {
         });
     }
 
-
     /**
-     * تحميل فيديو من Twitch.
-     * @param {string} url - رابط Twitch.
-     * @param {string} saveDir - المجلد لحفظ الفيديوهات.
-     * @returns {Promise<Object>} - الفيديو المحمل ومعلوماته.
+     * Download a video from Twitch.
+     * @param {string} url - The Twitch link.
+     * @param {string} saveDir - The directory to save the videos.
+     * @returns {Promise<Object>} - The downloaded video and its information.
      */
     async downloadFromTwitch(url, saveDir) {
         return new Promise((resolve, reject) => {
+            const decodedUrl = decodeURIComponent(url);
             if (!url.match(/^https:\/\/(?:www\.)?twitch\.tv\/.*/)) {
-                return reject({ error: `Not a valid Twitch URL: \`${url}\`` });
+                return reject({ error: `Not a valid Twitch URL: \`${decodedUrl}\`` });
             }
 
             this.ensureDirectoryExists(saveDir);
 
             // Set the arguments for yt-dlp
-            const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(title)s.%(ext)s')}`, url];
+            const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`, decodedUrl];
 
             const ytdlp = spawn(this.ytAppPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
-            let jsonResult;
 
             ytdlp.stdout.on('data', (data) => {
                 rawData += data.toString();
@@ -395,15 +404,10 @@ class Downlib {
 
             ytdlp.stderr.on('error', (data) => {
                 const message = `${data.toString().split(this.Split_issue).join("")}`;
-                console.error(`yt-dlp: ${message}`);
-                reject({ command: command, error: `${message}` });
+                reject({ command: command, error: `yt-dlp: ${message}` });
             });
 
             ytdlp.on('close', async (code) => {
-                if (code !== 0) {
-                    console.error(`yt-dlp process exited with code ${code}`);
-                    reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                }
                 try {
                     if (rawData.length === 0) return;
                     const jsonResult = JSON.parse(rawData);
@@ -418,7 +422,6 @@ class Downlib {
                         await this.deleteFile(filenameJson);
                     }
                 } catch (error) {
-                    console.error('Error processing the download data:', error);
                     reject({ command: command, error: `Error processing the download data: ${error}` });
                 }
             });
@@ -426,26 +429,25 @@ class Downlib {
     }
 
     /**
-     * تحميل فيديو من Dailymotion.
-     * @param {string} url - رابط Dailymotion.
-     * @param {string} saveDir - المجلد لحفظ الفيديوهات.
-     * @returns {Promise<Object>} - الفيديو المحمل ومعلوماته.
-     */
+    * Download a video from Dailymotion.
+    * @param {string} url - The Dailymotion link.
+    * @param {string} saveDir - The directory to save the videos.
+    * @returns {Promise<Object>} - The downloaded video and its information.
+    */
     async downloadFromDailymotion(url, saveDir) {
+        const decodedUrl = decodeURIComponent(url);
         return new Promise((resolve, reject) => {
             if (!url.match(/^https:\/\/(?:www\.)?dailymotion\.com\/video\/.*/)) {
-                return reject({ error: `Not a valid Dailymotion video URL?: \`${url}\`` });
+                return reject({ error: `Not a valid Dailymotion video URL?: \`${decodedUrl}\`` });
             }
 
             this.ensureDirectoryExists(saveDir);
-
             // Set the arguments for yt-dlp
-            const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(title)s.%(ext)s')}`, url];
+            const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`, decodedUrl];
 
             const ytdlp = spawn(this.ytAppPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
-            let jsonResult;
 
             ytdlp.stdout.on('data', (data) => {
                 rawData += data.toString();
@@ -453,15 +455,10 @@ class Downlib {
 
             ytdlp.stderr.on('error', (data) => {
                 const message = `${data.toString().split(this.Split_issue).join("")}`;
-                console.error(`yt-dlp: ${message}`);
-                reject({ command: command, error: `${message}` });
+                reject({ command: command, error: `yt-dlp: ${message}` });
             });
 
             ytdlp.on('close', async (code) => {
-                if (code !== 0) {
-                    console.error(`yt-dlp process exited with code ${code}`);
-                    reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                }
                 try {
                     if (rawData.length === 0) return;
                     const jsonResult = JSON.parse(rawData);
@@ -476,7 +473,6 @@ class Downlib {
                         await this.deleteFile(filenameJson);
                     }
                 } catch (error) {
-                    console.error('Error processing the download data:', error);
                     reject({ command: command, error: `Error processing the download data: ${error}` });
                 }
             });
@@ -484,22 +480,35 @@ class Downlib {
     }
 
     /**
-     * تحميل مقطوعة صوتية من SoundCloud.
-     * @param {string} url - رابط SoundCloud.
-     * @param {string} saveDir - المجلد لحفظ الملفات الصوتية.
-     * @returns {Promise<Object>} - الملف الصوتي المحمل ومعلوماته.
+     * Download an audio track from SoundCloud.
+     * @param {string} url - The SoundCloud link.
+     * @param {string} saveDir - The directory to save the audio files.
+     * @returns {Promise<Object>} - The downloaded audio file and its information.
      */
     async downloadFromSoundCloud(url, saveDir) {
+        const decodedUrl = decodeURIComponent(url);
         return new Promise((resolve, reject) => {
-            if (!url.match(/^https:\/\/soundcloud\.com\/.*/)) {
-                return reject({ error: `Not a valid SoundCloud URL?: \`${url}\`` });
+
+            // Determine if the URL is for a playlist or a single track
+            const isPlaylist = decodedUrl.includes("/sets/");
+            if (isPlaylist) {
+                return reject({ error: `Playlists are not supported: \`${decodedUrl}\`` });
             }
 
+            // Regular expression pattern for valid SoundCloud URLs
+            const soundCloudUrlPattern = /^(https:\/\/(soundcloud\.com\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+|on\.soundcloud\.com\/[a-zA-Z0-9]+))$/;
+            // Check if the URL matches the pattern
+            if (!soundCloudUrlPattern.test(decodedUrl)) {
+                return reject({ error: `Invalid SoundCloud URL format: \`${decodedUrl}\`` });
+            }
+
+
             this.ensureDirectoryExists(saveDir);
-            const filename = path.join(saveDir, `${this.generateUniqueId(20)}_.mp3`);
+            const UniqueId = this.generateUniqueId(20);
+            const filename = path.join(saveDir, `${UniqueId}_.mp3`);
 
             // Set the arguments for yt-dlp
-            const args = ['--print-json', '--write-info-json', '--extract-audio', '--audio-format', 'mp3', '--output', `${filename}`, url];
+            const args = ['--print-json', '--write-info-json', '--extract-audio', '--audio-format', 'mp3', '--output', `${filename}`, decodedUrl];
 
             const ytdlp = spawn(this.ytAppPath, args);
             const command = ytdlp.spawnargs.join(" ");
@@ -511,19 +520,15 @@ class Downlib {
 
             ytdlp.stderr.on('error', (data) => {
                 const message = `${data.toString().split(this.Split_issue).join("")}`;
-                console.error(`yt-dlp: ${message}`);
-                reject({ command: command, error: `${message}` });
+                reject({ command: command, error: `yt-dlp: ${message}` });
             });
 
             ytdlp.on('close', async (code) => {
-                if (code !== 0) {
-                    console.error(`yt-dlp process exited with code ${code}`);
-                    reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                }
                 try {
                     if (rawData.length === 0) return
                     const jsonResult = JSON.parse(rawData);
-                    const filenameJson = filename + ".info.json"
+                    const filenameJson = path.join(saveDir, `${UniqueId}_.info.json`);
+                    const filenameJsonMp3 = path.join(saveDir, `${UniqueId}_.mp3.info.json`);
                     const fileBuffer = fs.readFileSync(filename);
                     delete jsonResult.formats;
                     let buffer = fileBuffer;
@@ -531,37 +536,36 @@ class Downlib {
                     if (this.deleteAfterDownload) {
                         await this.deleteFile(filename);
                         await this.deleteFile(filenameJson);
+                        await this.deleteFile(filenameJsonMp3);
                     }
                 } catch (error) {
-                    console.error('Error processing the download data:', error);
                     reject({ command: command, error: `Error processing the download data: ${error}` });
                 }
             });
         });
     }
 
-
     /**
-     * تحميل فيديو من Reddit.
-     * @param {string} url - رابط Reddit.
-     * @param {string} saveDir - المجلد لحفظ الفيديوهات.
-     * @returns {Promise<Object>} - الفيديو المحمل ومعلوماته.
+     * Download a video from Reddit.
+     * @param {string} url - The Reddit link.
+     * @param {string} saveDir - The directory to save the videos.
+     * @returns {Promise<Object>} - The downloaded video and its information.
      */
     async downloadFromReddit(url, saveDir) {
+        const decodedUrl = decodeURIComponent(url);
         return new Promise((resolve, reject) => {
             if (!url.match(/^https:\/\/(?:www\.)?reddit\.com\/.*\/.*/)) {
-                return reject({ error: `Not a valid Reddit URL?: \`${url}\`` });
+                return reject({ error: `Not a valid Reddit URL?: \`${decodedUrl}\`` });
             }
 
             this.ensureDirectoryExists(saveDir);
 
             // Set the arguments for yt-dlp
-            const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(title)s.%(ext)s')}`, url];
+            const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`, decodedUrl];
 
             const ytdlp = spawn(this.ytAppPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
-            let jsonResult;
 
             ytdlp.stdout.on('data', (data) => {
                 rawData += data.toString();
@@ -569,15 +573,10 @@ class Downlib {
 
             ytdlp.stderr.on('error', (data) => {
                 const message = `${data.toString().split(this.Split_issue).join("")}`;
-                console.error(`yt-dlp: ${message}`);
-                reject({ command: command, error: `${message}` });
+                reject({ command: command, error: `yt-dlp: ${message}` });
             });
 
             ytdlp.on('close', async (code) => {
-                if (code !== 0) {
-                    console.error(`yt-dlp process exited with code ${code}`);
-                    reject({ command: command, error: `yt-dlp process exited with code ${code}` });
-                }
                 try {
                     if (rawData.length === 0) return;
                     const jsonResult = JSON.parse(rawData);
@@ -592,7 +591,6 @@ class Downlib {
                         await this.deleteFile(filenameJson);
                     }
                 } catch (error) {
-                    console.error('Error processing the download data:', error);
                     reject({ command: command, error: `Error processing the download data: ${error}` });
                 }
             });
@@ -600,9 +598,9 @@ class Downlib {
     }
 
     /**
-     * تحقق مما إذا كان النص المعطى يمثل رابط صحيح.
-     * @param {string} url - النص للتحقق منه.
-     * @returns {boolean} - true إذا كان النص يمثل رابط صحيح، وfalse إذا لم يكن.
+     * Check if the given text represents a valid URL.
+     * @param {string} url - The text to check.
+     * @returns {boolean} - true if the text represents a valid URL, false otherwise.
      */
     isValidUrl(url) {
         let valid = false;
@@ -616,23 +614,22 @@ class Downlib {
     }
 
     /**
-     * التحقق من نوع الرابط.
-     * @param {string} url - الرابط للتحقق.
-     * @returns {string} - نوع الموقع (YouTube, Instagram, TikTok, Facebook, Twitter, Reddit, SoundCloud, Dailymotion, Twitch).
+     * Check the type of the URL.
+     * @param {string} url - The URL to check.
+     * @returns {string} - The type of the website (YouTube, Instagram, TikTok, Facebook, Twitter, Reddit, SoundCloud, Dailymotion, Twitch).
      */
     checkUrlType(url) {
-
         if (!this.isValidUrl(url)) {
             return 'Invalid URL';
         }
         const patterns = {
             'YouTube': /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/,
             'Instagram': /^(https?:\/\/)?(www\.)?instagram\.com\/.+$/,
-            'TikTok': /^(https?:\/\/)?(www\.)?tiktok\.com\/.+$/,
+            'TikTok': /^(https?:\/\/)?(www\.)?(tiktok\.com|vt\.tiktok\.com)\/[\w\-\.]+\/?$/,
             'Facebook': /^(https?:\/\/)?(www\.)?facebook\.com\/.+$/,
             'Twitter': /^(https?:\/\/)?(www\.)?(twitter\.com|x\.com)\/.+$/,
             'Reddit': /^(https?:\/\/)?(www\.)?reddit\.com\/.+$/,
-            'SoundCloud': /^(https?:\/\/)?(www\.)?soundcloud\.com\/.+$/,
+            'SoundCloud': /^(https?:\/\/)?(www\.)?(soundcloud\.com|on\.soundcloud\.com)\/.+$/,
             'Dailymotion': /^(https?:\/\/)?(www\.)?dailymotion\.com\/.+$/,
             'Twitch': /^(https?:\/\/)?(www\.)?twitch\.tv\/.+$/
         };
@@ -644,7 +641,6 @@ class Downlib {
         }
         return 'Unknown';
     }
-
 
     /**
      * Generates a unique ID consisting of alphanumeric characters.
