@@ -489,19 +489,20 @@ class Downlib {
      */
     async downloadFromSoundCloud(url, saveDir) {
         const decodedUrl = decodeURIComponent(url);
+        const cleanedUrl = decodedUrl.split('?')[0];
         return new Promise((resolve, reject) => {
 
             // Determine if the URL is for a playlist or a single track
-            const isPlaylist = decodedUrl.includes("/sets/");
+            const isPlaylist = cleanedUrl.includes("/sets/");
             if (isPlaylist) {
-                return reject({ error: `Playlists are not supported: \`${decodedUrl}\`` });
+                return reject({ error: `Playlists are not supported: \`${cleanedUrl}\`` });
             }
 
             // Regular expression pattern for valid SoundCloud URLs
             const soundCloudUrlPattern = /^(https:\/\/(soundcloud\.com\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+|on\.soundcloud\.com\/[a-zA-Z0-9]+))$/;
             // Check if the URL matches the pattern
-            if (!soundCloudUrlPattern.test(decodedUrl)) {
-                return reject({ error: `Invalid SoundCloud URL format: \`${decodedUrl}\`` });
+            if (!soundCloudUrlPattern.test(cleanedUrl)) {
+                return reject({ error: `Invalid SoundCloud URL format: \`${cleanedUrl}\`` });
             }
 
 
@@ -510,7 +511,7 @@ class Downlib {
             const filename = path.join(saveDir, `${UniqueId}_.mp3`);
 
             // Set the arguments for yt-dlp
-            const args = ['--print-json', '--write-info-json', '--extract-audio', '--audio-format', 'mp3', '--output', `${filename}`, decodedUrl];
+            const args = ['--print-json', '--write-info-json', '--extract-audio', '--audio-format', 'mp3', '--output', `${filename}`, cleanedUrl];
 
             const ytdlp = spawn(this.ytAppPath, args);
             const command = ytdlp.spawnargs.join(" ");
