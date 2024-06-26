@@ -626,7 +626,7 @@ class Downlib {
         }
         const patterns = {
             'YouTube': /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/,
-            'Instagram': /^(https?:\/\/)?(www\.)?instagram\.com\/.+$/,
+            'Instagram': /^(https?:\/\/)?(www\.)?(instagram\.com|instagr\.am)\/.+$/,
             'TikTok': /^(https?:\/\/)?(www\.)?(tiktok\.com|vt\.tiktok\.com)\/[\w\-\.]+\/?$/,
             'Facebook': /^(https?:\/\/)?(www\.)?facebook\.com\/.+$/,
             'Twitter': /^(https?:\/\/)?(www\.)?(twitter\.com|x\.com)\/.+$/,
