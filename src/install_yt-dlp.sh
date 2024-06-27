@@ -23,6 +23,7 @@ check_terminal_type() {
     case "$SHELL_TYPE" in
         "bash")
             CONFIG_FILE=".bashrc"
+            PROFILE_FILE=".bash_profile"
             print_green "Terminal type detected: Bash"
             ;;
         "zsh")
@@ -37,10 +38,20 @@ check_terminal_type() {
 
     # تحديد مسار الملف التهيئة
     CONFIG_PATH="$HOME/$CONFIG_FILE"
+    PROFILE_PATH="$HOME/$PROFILE_FILE"
 }
 
 # تحقق من نوع الطرفية الحالية
 check_terminal_type
+
+# إذا كانت الطرفية bash، تحقق من وجود تضمين لـ ~/.bashrc في ~/.bash_profile
+if [ "$SHELL_TYPE" = "bash" ] && [ ! -f "$PROFILE_PATH" ]; then
+    echo "" >> "$PROFILE_PATH"
+    echo "if [ -f ~/.bashrc ]; then" >> "$PROFILE_PATH"
+    echo "    . ~/.bashrc" >> "$PROFILE_PATH"
+    echo "fi" >> "$PROFILE_PATH"
+    print_green "Added ~/.bashrc source inclusion to $PROFILE_PATH"
+fi
 
 # تحديد المجلد المستهدف
 SCRIPT_DIR=$(dirname "$(realpath "$0" 2>/dev/null || readlink -f "$0")")
