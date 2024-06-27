@@ -28,13 +28,14 @@ class Downlib {
      * @param {object} options - An object containing settings.
      */
     constructor(options) {
-
-        const ytDlpPath = which.sync('yt-dlp');
-        this.deleteAfterDownload = options?.deleteAfterDownload;
-        this.__dirname = path.dirname(fileURLToPath(import.meta.url));
-        this.ytApp = ytDlpPath ? ytDlpPath : (options.ytApp !== undefined && options.ytApp !== "" ? options.ytApp : undefined);
-        this.ytAppPath = this.ytApp ? path.join(this.__dirname, this.ytApp) : "yt-dlp";
-        this.Split_issue = " please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U\n";
+        (async () => {
+            const ytDlpPath = await which('yt-dlp', { nothrow: false });
+            this.deleteAfterDownload = options?.deleteAfterDownload;
+            this.__dirname = path.dirname(fileURLToPath(import.meta.url));
+            this.ytApp = ytDlpPath ? ytDlpPath : (options.ytApp !== undefined && options.ytApp !== "" ? options.ytApp : undefined);
+            this.ytAppPath = this.ytApp ? path.join(this.__dirname, this.ytApp) : "yt-dlp";
+            this.Split_issue = " please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U\n";
+        })();
     }
 
     /**
