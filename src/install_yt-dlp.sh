@@ -17,10 +17,35 @@ print_red() {
     echo -e "\e[31m$1\e[0m"
 }
 
+# دالة لفحص نوع الطرفية
+check_terminal_type() {
+    SHELL_TYPE=$(basename "$SHELL")
+    case "$SHELL_TYPE" in
+        "bash")
+            CONFIG_FILE=".bashrc"
+            print_green "Terminal type detected: Bash"
+            ;;
+        "zsh")
+            CONFIG_FILE=".zshrc"
+            print_green "Terminal type detected: Zsh"
+            ;;
+        *)
+            print_red "Unsupported terminal type: $SHELL_TYPE"
+            exit 1
+            ;;
+    esac
+
+    # تحديد مسار الملف التهيئة
+    CONFIG_PATH="$HOME/$CONFIG_FILE"
+}
+
+# تحقق من نوع الطرفية الحالية
+check_terminal_type
+
 # تحديد المجلد المستهدف
 SCRIPT_DIR=$(dirname "$(realpath "$0" 2>/dev/null || readlink -f "$0")")
 INSTALL_DIR="$SCRIPT_DIR/yt-dlp"
-mkdir -p "$INSTALL_DIR"
+mkdir -p "$INSTALL_DIR"  # إنشاء المجلد إذا لم يكن موجوداً
 
 # تعريف مسار yt-dlp كاملاً
 YT_DLP_PATH="$INSTALL_DIR/yt-dlp"
@@ -28,41 +53,27 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     YT_DLP_PATH="$INSTALL_DIR/yt-dlp_macos"
 fi
 
-# التحقق من نوع الطرفية (bash أو zsh أو bashrc)
-if [[ -n "$BASH_VERSION" ]]; then
-    profile_file=~/.bash_profile
-elif [[ -n "$ZSH_VERSION" ]]; then
-    profile_file=~/.zshrc
-elif [[ -f ~/.bashrc ]]; then
-    profile_file=~/.bashrc
-else
-    print_red "Unsupported shell. Please add yt-dlp to your PATH manually."
-    exit 1
+# إنشاء رابط رمزي إلى yt-dlp في ~/bin
+SYMLINK_PATH="$HOME/bin/yt-dlp"
+if [ ! -d "$HOME/bin" ]; then
+    mkdir -p "$HOME/bin"
 fi
 
-# التحقق مما إذا كان المتغير معرف بالفعل
-if grep -q "export yt-dlp=\"$YT_DLP_PATH\"" "$profile_file"; then
-    print_green "yt-dlp already exists in $profile_file"
+if [ ! -f "$SYMLINK_PATH" ]; then
+    ln -sf "$YT_DLP_PATH" "$SYMLINK_PATH"
+    print_green "Created symlink to yt-dlp in $SYMLINK_PATH"
 else
-    echo "export yt-dlp=\"$YT_DLP_PATH\"" >> "$profile_file"
-    print_green "yt-dlp added to $profile_file"
+    print_red "Symlink to yt-dlp already exists in $SYMLINK_PATH"
 fi
 
-# إضافة yt-dlp إلى مسار البيئة إذا لم يتم ذلك بالفعل
-if ! command -v yt-dlp &>/dev/null; then
-    export PATH="$YT_DLP_PATH:$PATH"
-    if grep -q "export PATH=\"$YT_DLP_PATH:\$PATH\"" "$profile_file"; then
-        print_green "PATH already includes $YT_DLP_PATH"
-    else
-        echo "export PATH=\"$YT_DLP_PATH:\$PATH\"" >> "$profile_file"
-        print_green "PATH updated in $profile_file"
-    fi
-else
-    print_green "yt-dlp already exists in PATH"
-fi
+# إضافة الأوامر إلى ملف التهيئة المناسب
+echo "" >> "$CONFIG_PATH"
+echo "# إعدادات yt-dlp" >> "$CONFIG_PATH"
+echo "export PATH=\"\$PATH:$HOME/bin\"" >> "$CONFIG_PATH"
+print_green "Added yt-dlp settings to $CONFIG_PATH"
 
 # تحديث المتغيرات في الحالية وتفعيلها
-source "$profile_file"
+source "$CONFIG_PATH"
 print_green "Environment variables updated"
 
 # تثبيت yt-dlp حسب نظام التشغيل
