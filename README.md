@@ -25,6 +25,7 @@ import Downlib from 'downlib';
 
 // Initialize Downlib with optional configurations
 const downlib = new Downlib({
+    ytApp: '', // Optional: Specify the path for yt-dlp if needed
     deleteAfterDownload: true,
 });
 

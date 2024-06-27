@@ -1,10 +1,11 @@
 {
   "name": "downlib",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "A powerful library for downloading videos and files from various platforms.",
   "main": "src/Downlib.js",
   "type": "module",
   "scripts": {
+    "postinstall": "node src/installYtDlp.js",
     "test": "node test.js"
   },
   "keywords": [

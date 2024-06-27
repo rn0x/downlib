@@ -14,6 +14,7 @@ import { spawn } from 'child_process';
 import instagramGetUrl from './instagramGetUrl.js';
 import { fileTypeFromBuffer } from 'file-type';
 import { fileURLToPath } from 'url';
+import which from 'which';
 import tiktokdl from './tiktok-dl.js';
 
 
@@ -28,13 +29,11 @@ class Downlib {
      */
     constructor(options) {
 
-        this.options = options;
+        const ytDlpPath = which.sync('yt-dlp');
         this.deleteAfterDownload = options?.deleteAfterDownload;
         this.__dirname = path.dirname(fileURLToPath(import.meta.url));
-        this.ytApp = os.platform() === 'win32' ? "../yt-dlp/yt-dlp.exe" :
-            os.platform() === 'linux' ? "../yt-dlp/yt-dlp" :
-                os.platform() === 'darwin' ? "../yt-dlp/yt-dlp_macos" : false;
-        this.ytAppPath = this.ytApp ? path.join(this.__dirname, this.ytApp) : "yt-dlp"
+        this.ytApp = ytDlpPath ? ytDlpPath : (options.ytApp !== undefined && options.ytApp !== "" ? options.ytApp : undefined);
+        this.ytAppPath = this.ytApp ? path.join(this.__dirname, this.ytApp) : "yt-dlp";
         this.Split_issue = " please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U\n";
     }
 
@@ -559,7 +558,7 @@ class Downlib {
         return new Promise((resolve, reject) => {
             if (!url.match(/^https?:\/\/(?:www\.)?(reddit\.com|redd\.it)\/.*/)) {
                 return reject({ error: `Not a valid Reddit URL?: \`${decodedUrl}\`` });
-            }            
+            }
 
             this.ensureDirectoryExists(saveDir);
 
