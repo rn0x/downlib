@@ -14,8 +14,8 @@ import { spawn } from 'child_process';
 import instagramGetUrl from './instagramGetUrl.js';
 import { fileTypeFromBuffer } from 'file-type';
 import { fileURLToPath } from 'url';
-import which from 'which';
 import tiktokdl from './tiktok-dl.js';
+import setupYtDlp from './setupYtDlp.js';
 
 
 /**
@@ -28,14 +28,28 @@ class Downlib {
      * @param {object} options - An object containing settings.
      */
     constructor(options) {
-        (async () => {
-            const ytDlpPath = await which('yt-dlp', { nothrow: true });
-            this.deleteAfterDownload = options?.deleteAfterDownload;
-            this.__dirname = path.dirname(fileURLToPath(import.meta.url));
-            this.ytApp = ytDlpPath ? ytDlpPath : (options.ytApp !== undefined && options.ytApp !== "" ? options.ytApp : undefined);
-            this.ytAppPath = this.ytApp ? this.ytApp : "yt-dlp";
-            this.Split_issue = " please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U\n";
-        })();
+        this.options = options;
+        this.deleteAfterDownload = options?.deleteAfterDownload;
+        this.__dirname = path.dirname(fileURLToPath(import.meta.url));
+        this.Split_issue = " please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U\n";
+
+        // Bind the method to ensure correct context
+        this.downloadFromYouTube = this.downloadFromYouTube.bind(this);
+    }
+
+    /**
+     * Retrieve yt-dlp executable path asynchronously.
+     * @returns {Promise<string>} Resolves with the yt-dlp executable path.
+     */
+    async getYtDlpPath() {
+        try {
+            const ytDlpDir = path.resolve(this.__dirname, 'yt-dlp');
+            const ytDlp = await setupYtDlp(ytDlpDir, { log: false });
+            return ytDlp.ytDlpPath || this.options?.ytApp ? this.options.ytApp : "yt-dlp";
+        } catch (error) {
+            console.error("Error setting up ytDlp:", error);
+            return "yt-dlp";
+        }
     }
 
     /**
@@ -182,8 +196,10 @@ class Downlib {
         }
 
         args.push(decodedUrl);
-        const ytdlp = spawn(this.ytAppPath, args);
-        const command = `${this.ytAppPath} ${args.join(' ')}`;
+
+        const ytDlpPath = await this.getYtDlpPath();
+        const ytdlp = spawn(ytDlpPath, args);
+        const command = `${ytDlpPath} ${args.join(' ')}`;
         let rawData = '';
 
         ytdlp.stdout.on('data', (data) => {
@@ -279,7 +295,7 @@ class Downlib {
      * @returns {Promise<Object>} - The downloaded video and its information.
      */
     async downloadFromTwitter(url, saveDir) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             const decodedUrl = decodeURIComponent(url);
             if (!decodedUrl.match(/^https?:\/\/(?:twitter\.com|x\.com|t\.co)\/.*/)) {
                 return reject({ error: `Not a valid x platform (Twitter) URL?: \`${decodedUrl}\`` });
@@ -290,7 +306,8 @@ class Downlib {
             // Set the arguments for yt-dlp
             const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`, decodedUrl];
 
-            const ytdlp = spawn(this.ytAppPath, args);
+            const ytDlpPath = await this.getYtDlpPath();
+            const ytdlp = spawn(ytDlpPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
 
@@ -332,7 +349,7 @@ class Downlib {
      * @returns {Promise<Object>} - The downloaded video and its information.
      */
     async downloadFromFacebook(url, saveDir) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             const decodedUrl = decodeURIComponent(url);
             if (!decodedUrl.match(/^https:\/\/(?:www\.)?facebook\.com\/.*\/videos\/.*/)) {
                 return reject({ error: `Not a valid Facebook video URL?: \`${decodedUrl}\`` });
@@ -343,7 +360,8 @@ class Downlib {
             // Set the arguments for yt-dlp
             const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`, decodedUrl];
 
-            const ytdlp = spawn(this.ytAppPath, args);
+            const ytDlpPath = await this.getYtDlpPath();
+            const ytdlp = spawn(ytDlpPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
 
@@ -385,7 +403,7 @@ class Downlib {
      * @returns {Promise<Object>} - The downloaded video and its information.
      */
     async downloadFromTwitch(url, saveDir) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             const decodedUrl = decodeURIComponent(url);
             if (!url.match(/^https:\/\/(?:www\.)?twitch\.tv\/.*/)) {
                 return reject({ error: `Not a valid Twitch URL: \`${decodedUrl}\`` });
@@ -396,7 +414,8 @@ class Downlib {
             // Set the arguments for yt-dlp
             const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`, decodedUrl];
 
-            const ytdlp = spawn(this.ytAppPath, args);
+            const ytDlpPath = await this.getYtDlpPath();
+            const ytdlp = spawn(ytDlpPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
 
@@ -438,7 +457,7 @@ class Downlib {
     */
     async downloadFromDailymotion(url, saveDir) {
         const decodedUrl = decodeURIComponent(url);
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             if (!url.match(/^https:\/\/(?:www\.)?dailymotion\.com\/video\/.*/)) {
                 return reject({ error: `Not a valid Dailymotion video URL?: \`${decodedUrl}\`` });
             }
@@ -447,7 +466,8 @@ class Downlib {
             // Set the arguments for yt-dlp
             const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`, decodedUrl];
 
-            const ytdlp = spawn(this.ytAppPath, args);
+            const ytDlpPath = await this.getYtDlpPath();
+            const ytdlp = spawn(ytDlpPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
 
@@ -490,7 +510,7 @@ class Downlib {
     async downloadFromSoundCloud(url, saveDir) {
         const decodedUrl = decodeURIComponent(url);
         const cleanedUrl = decodedUrl.split('?')[0];
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
 
             // Determine if the URL is for a playlist or a single track
             const isPlaylist = cleanedUrl.includes("/sets/");
@@ -513,7 +533,8 @@ class Downlib {
             // Set the arguments for yt-dlp
             const args = ['--print-json', '--write-info-json', '--extract-audio', '--audio-format', 'mp3', '--output', `${filename}`, cleanedUrl];
 
-            const ytdlp = spawn(this.ytAppPath, args);
+            const ytDlpPath = await this.getYtDlpPath();
+            const ytdlp = spawn(ytDlpPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
 
@@ -556,7 +577,7 @@ class Downlib {
      */
     async downloadFromReddit(url, saveDir) {
         const decodedUrl = decodeURIComponent(url);
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             if (!url.match(/^https?:\/\/(?:www\.)?(reddit\.com|redd\.it)\/.*/)) {
                 return reject({ error: `Not a valid Reddit URL?: \`${decodedUrl}\`` });
             }
@@ -566,7 +587,8 @@ class Downlib {
             // Set the arguments for yt-dlp
             const args = ['--print-json', '--write-info-json', '--merge-output-format', 'mp4', '--output', `${path.join(saveDir, '%(id)s.%(ext)s')}`, decodedUrl];
 
-            const ytdlp = spawn(this.ytAppPath, args);
+            const ytDlpPath = await this.getYtDlpPath();
+            const ytdlp = spawn(ytDlpPath, args);
             const command = ytdlp.spawnargs.join(" ");
             let rawData = '';
 
