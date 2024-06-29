@@ -45,7 +45,7 @@ class Downlib {
         try {
             const ytDlpDir = path.resolve(this.__dirname, 'yt-dlp');
             const ytDlp = await setupYtDlp(ytDlpDir, { log: false });
-            return ytDlp.ytDlpPath || this.options?.ytApp ? this.options.ytApp : "yt-dlp";
+            return ytDlp.ytDlpPath || this.options.ytApp || 'yt-dlp';
         } catch (error) {
             console.error("Error setting up ytDlp:", error);
             return "yt-dlp";
@@ -198,8 +198,9 @@ class Downlib {
         args.push(decodedUrl);
 
         const ytDlpPath = await this.getYtDlpPath();
-        const ytdlp = spawn(ytDlpPath, args);
         const command = `${ytDlpPath} ${args.join(' ')}`;
+
+        const ytdlp = spawn(ytDlpPath, args);
         let rawData = '';
 
         ytdlp.stdout.on('data', (data) => {

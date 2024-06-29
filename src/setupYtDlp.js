@@ -120,8 +120,17 @@ const setupYtDlp = async (outputDir, options = {}) => {
         fs.unlinkSync(downloadedPath); // Delete the zip archive after extraction
     }
 
+    let executablePath;
+    if (platform === 'win32') {
+        executablePath = ytDlpPath;
+    } else if (platform === 'darwin') {
+        executablePath = path.join(outputDir, 'yt-dlp_macos');
+    } else {
+        executablePath = path.join(outputDir, 'yt-dlp');
+    }
+
     return {
-        ytDlpPath: ytDlpPath.endsWith('.exe') || ytDlpPath.endsWith('_macos') ? ytDlpPath : path.join(outputDir, 'yt-dlp')
+        ytDlpPath: executablePath
     };
 };
 
