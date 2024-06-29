@@ -649,16 +649,16 @@ class Downlib {
             return 'Invalid URL';
         }
         const patterns = {
-            'YouTube': /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/,
-            'Instagram': /^(https?:\/\/)?(www\.)?(instagram\.com|instagr\.am)\/.+$/,
-            'TikTok': /^(https?:\/\/)?(www\.)?(tiktok\.com|vt\.tiktok\.com)\/[\w\-\.]+\/?$/,
-            'Facebook': /^(https?:\/\/)?(www\.)?facebook\.com\/.+$/,
-            'Twitter': /^(https?:\/\/)?(www\.)?(twitter\.com|x\.com)\/.+$/,
-            'Reddit': /^(https?:\/\/)?(www\.)?(redd\.it|reddit\.com)\/.+$/,
-            'SoundCloud': /^(https?:\/\/)?(www\.)?(soundcloud\.com|on\.soundcloud\.com)\/.+$/,
-            'Dailymotion': /^(https?:\/\/)?(www\.)?dailymotion\.com\/.+$/,
-            'Twitch': /^(https?:\/\/)?(www\.)?twitch\.tv\/.+$/,
-            'Telegram': /^(https?:\/\/)?(www\.)?(t\.me\/\w+|telegram\.me\/\w+)$/,
+            'YouTube': /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/?.*$/,
+            'Instagram': /^(https?:\/\/)?(www\.)?(instagram\.com|instagr\.am)\/?.*$/,
+            'TikTok': /^(https?:\/\/)?(www\.)?(tiktok\.com|vt\.tiktok\.com)\/?.*$/,
+            'Facebook': /^(https?:\/\/)?(www\.)?facebook\.com\/?.*$/,
+            'Twitter': /^(https?:\/\/)?(www\.)?(twitter\.com|x\.com)\/?.*$/,
+            'Reddit': /^(https?:\/\/)?(www\.)?(redd\.it|reddit\.com)\/?.*$/,
+            'SoundCloud': /^(https?:\/\/)?(www\.)?(soundcloud\.com|on\.soundcloud\.com)\/?.*$/,
+            'Dailymotion': /^(https?:\/\/)?(www\.)?dailymotion\.com\/?.*$/,
+            'Twitch': /^(https?:\/\/)?(www\.)?twitch\.tv\/?.*$/,
+            'Telegram': /^(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\/?.*$/,
         };
 
         for (const [type, pattern] of Object.entries(patterns)) {
