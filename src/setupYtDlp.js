@@ -17,9 +17,10 @@ import path from 'path';
  * @param {string} url - The URL of the file to download.
  * @param {string} outputPath - The path to save the downloaded file.
  * @param {boolean} log - Whether to print log messages.
+ * @param {string} platform - Returns a string identifying the operating system platform.
  * @returns {string} The path to the downloaded file.
  */
-const downloadFile = (url, outputPath, log) => {
+const downloadFile = (url, outputPath, log, platform) => {
     if (fs.existsSync(outputPath)) {
         if (log) console.log(`File ${outputPath} already exists. Skipping download.`);
         return outputPath; // Return outputPath if file exists
@@ -29,6 +30,11 @@ const downloadFile = (url, outputPath, log) => {
     const command = `curl -L ${url} -o ${outputPath}`;
     execSync(command);
     if (log) console.log(`Downloaded to ${outputPath}`);
+
+    // Set executable permissions for Linux
+    if (platform === 'linux') {
+        fs.chmodSync(outputPath, 0o755); // Make the file executable
+    }
     return outputPath; // Return outputPath after download
 };
 
@@ -104,7 +110,7 @@ const setupYtDlp = async (outputDir, options = {}) => {
     }
 
     const ytDlpPath = path.join(outputDir, path.basename(ytDlpUrl));
-    const downloadedPath = downloadFile(ytDlpUrl, ytDlpPath, log);
+    const downloadedPath = downloadFile(ytDlpUrl, ytDlpPath, log, platform);
 
     if (ytDlpUrl.endsWith('.tar.gz')) {
         extractTarGz(downloadedPath, outputDir, log);
