@@ -9,7 +9,7 @@
 // postinstall.js
 import path from 'path';
 import { fileURLToPath } from 'url';
-import setupYtDlp from "./src/setupYtDlp";
+import setupYtDlp from "./src/setupYtDlp.js";
 
 // Convert __dirname to ES module equivalent
 const __filename = fileURLToPath(import.meta.url);
