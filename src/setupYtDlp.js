@@ -87,7 +87,7 @@ const setupYtDlp = async (outputDir, options = {}) => {
     const platform = os.platform();
     let ytDlpUrl;
 
-    if (platform === 'linux') {
+    if (platform === 'linux' && 'android') {
         if (arch === 'x64') {
             ytDlpUrl = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux';
         } else if (arch === 'arm64') {
