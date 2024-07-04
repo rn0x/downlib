@@ -363,6 +363,43 @@ class Downlib {
     }
 
     /**
+     * Download a video from Twitter.
+     * @param {string} url - The Twitter link.
+     * @param {string} saveDir - The directory to save the videos.
+     * @param {boolean} options.audioOnly - If true, download audio only.
+     * @returns {Promise<Object>} - The downloaded video and its information.
+     */
+    async downloadFromTwitter(url, saveDir, options = { audioOnly: false }) {
+        try {
+            const decodedUrl = decodeURIComponent(url);
+            if (!decodedUrl.match(/^https?:\/\/(?:twitter\.com|x\.com|t\.co)\/.*/)) {
+                return { error: `Not a valid x platform (Twitter) URL?: \`${decodedUrl}\`` };
+            }
+
+            const additionalArguments = [];
+            if (options.audioOnly) {
+                additionalArguments.push('--extract-audio', '--audio-format', 'mp3'); // Download audio only
+            }
+
+            const getYtDlp = await getYtDlpPath();
+            const ytDlpApp = getYtDlp ? getYtDlp : this.ytDlpPath ? this.ytDlpPath : 'yt-dlp';
+            const result = await downloadMedia(ytDlpApp, url, saveDir, additionalArguments);
+
+            if (result?.success && this.deleteAfterDownload) {
+                const filePath = path.join(saveDir, `${result.filename}.${options.audioOnly ? 'mp3' : result.json.ext}`);
+                const fileInfoJsonPath = path.join(saveDir, `${result.filename}.info.json`);
+                await deleteFile(filePath);
+                await deleteFile(fileInfoJsonPath);
+            }
+
+            return result;
+
+        } catch (error) {
+            return { success: false, error: `Error in downloadFromTwitter: ${error}` };
+        }
+    }
+
+    /**
      * Download a video from Twitch.
      * @param {string} url - The Twitch link.
      * @param {string} saveDir - The directory to save the videos.
