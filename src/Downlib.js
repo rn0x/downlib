@@ -48,6 +48,38 @@ function generateUniqueId(length) {
 }
 
 /**
+ * Reads a file and returns its content as a buffer.
+ * @param {string} filePath - The path to the file.
+ * @returns {Promise<object>} - A promise that resolves with an object containing the success status, message, and buffer or error.
+ */
+function getFileBuffer(filePath) {
+    try {
+        if (!fs.existsSync(filePath)) {
+            return {
+                success: false,
+                message: 'File does not exist.',
+                error: 'ENOENT'
+            };
+        }
+
+        const fileBuffer = fs.readFileSync(filePath);
+        return {
+            success: true,
+            message: 'File buffer retrieved successfully.',
+            buffer: fileBuffer
+        };
+    } catch (error) {
+        console.error(`Error in getFileBuffer: ${error.message}`);
+        return {
+            success: false,
+            message: 'Failed to get file buffer.',
+            error: error.message
+        };
+    }
+}
+
+
+/**
  * Ensure directory exists by creating it if it doesn't.
  * @param {string} dirPath - Directory path to check/create.
  * @returns {Promise<void>} - Promise resolved once the directory is ensured.
@@ -138,7 +170,12 @@ async function downloadMedia(ytDlpPath, url, saveDir, additionalArgs = []) {
                         const infoJsonPath = path.join(saveDir, fileNameInfo);
                         const jsonData = fs.readFileSync(infoJsonPath, 'utf-8') || {};
                         const parsedData = JSON.parse(jsonData);
-                        resolve({ success: true, json: parsedData, filename: fileName, stdout });
+                        const result = await getFileBuffer(path.join(saveDir, `${fileName}.${parsedData?.ext}`));
+                        let buffer;
+                        if (result?.success) {
+                            buffer = result.buffer
+                        }
+                        resolve({ success: true, json: parsedData, filename: fileName, buffer, stdout });
                     } catch (err) {
                         resolve({ success: false, error: `Failed to read or parse JSON: ${err?.message}` });
                     }
