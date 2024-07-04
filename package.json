@@ -1,6 +1,6 @@
 {
   "name": "downlib",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "A powerful library for downloading videos and files from various platforms.",
   "main": "src/Downlib.js",
   "type": "module",

@@ -4,7 +4,9 @@ Downlib is a Node.js class for downloading content from various popular websites
 
 <div align="center">
 
-<img align="center" src = "https://komarev.com/ghpvc/?username=rn0x-downlib&label=REPOSITORY+VIEWS&style=for-the-badge" alt ="downlib"> <br><br>
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/rn0x/downlib/blob/main/LICENSE)
+[![npm version](https://badge.fury.io/js/downlib.svg)](https://badge.fury.io/js/downlib)
+![VIEWS](https://komarev.com/ghpvc/?username=rn0x-downlib&label=REPOSITORY+VIEWS&style=for-the-badge)
 
 </div>
 
@@ -25,14 +27,14 @@ import Downlib from 'downlib';
 
 // Initialize Downlib with optional configurations
 const downlib = new Downlib({
-    ytApp: '', // Optional: Specify the path for yt-dlp if needed
+    ytDlpPath: '', // Optional: Specify the path for yt-dlp if needed
     deleteAfterDownload: true,
 });
 
 // Example: Download a video from YouTube
 const youtubeUrl = 'https://www.youtube.com/watch?v=yourvideoid';
 const saveDir = './downloads';
-downlib.downloadFromYouTube(youtubeUrl, saveDir)
+downlib.downloadFromYouTube(youtubeUrl, saveDir, { audioOnly: false })
   .then((result) => {
     console.log('Downloaded video information:', result);
   })
@@ -90,12 +92,11 @@ const downlib = new Downlib(options);
 - `downloadFromYouTube(url, saveDir, options)`: Downloads videos or playlists from YouTube using `yt-dlp`. Supports options like `audioOnly` to download only audio.
 - `downloadFromTikTok(url, saveDir)`: Downloads videos from TikTok using a custom function (`tiktokdl`).
 - `downloadFromTwitter(url, saveDir)`: Downloads videos from Twitter using `yt-dlp`.
-- `downloadFromFacebook(url, saveDir)`: Downloads videos from Facebook using `yt-dlp`.
-- `downloadFromTwitch(url, saveDir)`: Downloads videos from Twitch using `yt-dlp`.
-- `downloadFromDailymotion(url, saveDir)`: Downloads videos from Dailymotion using `yt-dlp`.
+- `downloadFromFacebook(url, saveDir, options)`: Downloads videos from Facebook using `yt-dlp`.
+- `downloadFromTwitch(url, saveDir, options)`: Downloads videos from Twitch using `yt-dlp`.
+- `downloadFromDailymotion(url, saveDir, options)`: Downloads videos from Dailymotion using `yt-dlp`.
 - `downloadFromSoundCloud(url, saveDir)`: Downloads audio tracks from SoundCloud using `yt-dlp`.
-- `downloadFromReddit(url, saveDir)`: Downloads videos from Reddit using `yt-dlp`.
-- `generateUniqueId(length)`: Generates a unique ID of specified length.
+- `downloadFromReddit(url, saveDir, options)`: Downloads videos from Reddit using `yt-dlp`.
 - `checkUrlType(url)`: Checks the type of a URL and returns the corresponding social media platform or streaming service (YouTube, Instagram, TikTok, Pinterest, Facebook, Twitter, Reddit, SoundCloud, Dailymotion, Twitch). If the URL doesn't match any recognized patterns, it returns `'Unknown'`.
 
 #### Example Code
@@ -106,7 +107,7 @@ See examples above for usage of each method.
 
 You can pass optional configurations when initializing `Downlib`. These options include:
 
-- `options.ytApp`: Path to yt-dlp executable.
+- `options.ytDlpPath`: Path to yt-dlp executable.
 - `options.deleteAfterDownload`: Whether to delete the downloaded files after completion.
 
 ### Issues
