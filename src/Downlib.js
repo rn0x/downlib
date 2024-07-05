@@ -131,10 +131,11 @@ function isValidUrl(url) {
  * @param {string} ytDlpPath - URL of the media to download.
  * @param {string} url - URL of the media to download.
  * @param {string} saveDir - Directory to save the downloaded media.
+ * @param {boolean} audioOnly - If true, download audio only.
  * @param {string[]} additionalArgs - Additional arguments for yt-dlp.
  * @returns {Promise<object>} - Promise resolving to JSON object with video metadata.
  */
-async function downloadMedia(ytDlpPath, url, saveDir, additionalArgs = []) {
+async function downloadMedia(ytDlpPath, url, saveDir, audioOnly, additionalArgs = []) {
     try {
         // Ensure save directory exists
         await ensureDirExists(saveDir);
@@ -170,7 +171,7 @@ async function downloadMedia(ytDlpPath, url, saveDir, additionalArgs = []) {
                         const infoJsonPath = path.join(saveDir, fileNameInfo);
                         const jsonData = fs.readFileSync(infoJsonPath, 'utf-8') || {};
                         const parsedData = JSON.parse(jsonData);
-                        const result = await getFileBuffer(path.join(saveDir, `${fileName}.${parsedData?.ext}`));
+                        const result = await getFileBuffer(path.join(saveDir, `${fileName}.${audioOnly ? 'mp3' : parsedData?.ext}`));
                         let buffer;
                         if (result?.success) {
                             buffer = result.buffer
@@ -291,7 +292,7 @@ class Downlib {
      * @param {string} saveDir - The directory to save the videos.
      * @param {Object} options - Download options.
      * @param {boolean} options.audioOnly - If true, download audio only.
-     * @returns {Promise<Array>} - List of downloaded video information.
+     * @returns {Promise<Object>} - The downloaded video and its information.
      */
     async downloadFromYouTube(url, saveDir, options = { audioOnly: false }) {
         try {
@@ -309,7 +310,7 @@ class Downlib {
 
             const getYtDlp = await getYtDlpPath();
             const ytDlpApp = getYtDlp ? getYtDlp : this.ytDlpPath ? this.ytDlpPath : 'yt-dlp';
-            const result = await downloadMedia(ytDlpApp, url, saveDir, additionalArguments);
+            const result = await downloadMedia(ytDlpApp, url, saveDir, options.audioOnly, additionalArguments);
 
             if (result?.success && this.deleteAfterDownload) {
                 const filePath = path.join(saveDir, `${result.filename}.${options.audioOnly ? 'mp3' : result.json.ext}`);
@@ -346,7 +347,7 @@ class Downlib {
 
             const getYtDlp = await getYtDlpPath();
             const ytDlpApp = getYtDlp ? getYtDlp : this.ytDlpPath ? this.ytDlpPath : 'yt-dlp';
-            const result = await downloadMedia(ytDlpApp, url, saveDir, additionalArguments);
+            const result = await downloadMedia(ytDlpApp, url, saveDir, options.audioOnly, additionalArguments);
 
             if (result?.success && this.deleteAfterDownload) {
                 const filePath = path.join(saveDir, `${result.filename}.${options.audioOnly ? 'mp3' : result.json.ext}`);
@@ -383,7 +384,7 @@ class Downlib {
 
             const getYtDlp = await getYtDlpPath();
             const ytDlpApp = getYtDlp ? getYtDlp : this.ytDlpPath ? this.ytDlpPath : 'yt-dlp';
-            const result = await downloadMedia(ytDlpApp, url, saveDir, additionalArguments);
+            const result = await downloadMedia(ytDlpApp, url, saveDir, options.audioOnly, additionalArguments);
 
             if (result?.success && this.deleteAfterDownload) {
                 const filePath = path.join(saveDir, `${result.filename}.${options.audioOnly ? 'mp3' : result.json.ext}`);
@@ -420,7 +421,7 @@ class Downlib {
 
             const getYtDlp = await getYtDlpPath();
             const ytDlpApp = getYtDlp ? getYtDlp : this.ytDlpPath ? this.ytDlpPath : 'yt-dlp';
-            const result = await downloadMedia(ytDlpApp, url, saveDir, additionalArguments);
+            const result = await downloadMedia(ytDlpApp, url, saveDir, options.audioOnly, additionalArguments);
 
             if (result?.success && this.deleteAfterDownload) {
                 const filePath = path.join(saveDir, `${result.filename}.${options.audioOnly ? 'mp3' : result.json.ext}`);
@@ -457,7 +458,7 @@ class Downlib {
 
             const getYtDlp = await getYtDlpPath();
             const ytDlpApp = getYtDlp ? getYtDlp : this.ytDlpPath ? this.ytDlpPath : 'yt-dlp';
-            const result = await downloadMedia(ytDlpApp, url, saveDir, additionalArguments);
+            const result = await downloadMedia(ytDlpApp, url, saveDir, options.audioOnly, additionalArguments);
 
             if (result?.success && this.deleteAfterDownload) {
                 const filePath = path.join(saveDir, `${result.filename}.${options.audioOnly ? 'mp3' : result.json.ext}`);
@@ -501,7 +502,7 @@ class Downlib {
             const additionalArguments = ['--extract-audio', '--audio-format', 'mp3'];
             const getYtDlp = await getYtDlpPath();
             const ytDlpApp = getYtDlp ? getYtDlp : this.ytDlpPath ? this.ytDlpPath : 'yt-dlp';
-            const result = await downloadMedia(ytDlpApp, url, saveDir, additionalArguments);
+            const result = await downloadMedia(ytDlpApp, url, saveDir, undefined, additionalArguments);
 
             if (result?.success && this.deleteAfterDownload) {
                 const filePath = path.join(saveDir, `${result.filename}.mp3`);
@@ -538,7 +539,7 @@ class Downlib {
 
             const getYtDlp = await getYtDlpPath();
             const ytDlpApp = getYtDlp ? getYtDlp : this.ytDlpPath ? this.ytDlpPath : 'yt-dlp';
-            const result = await downloadMedia(ytDlpApp, url, saveDir, additionalArguments);
+            const result = await downloadMedia(ytDlpApp, url, saveDir, options.audioOnly, additionalArguments);
 
             if (result?.success && this.deleteAfterDownload) {
                 const filePath = path.join(saveDir, `${result.filename}.${options.audioOnly ? 'mp3' : result.json.ext}`);
